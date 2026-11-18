@@ -1,0 +1,410 @@
+/* =========================================
+   TEACHER PERFORMANCE PAGE
+   Load AFTER teacher_class.css.
+   Scoped to .performance-page so other pages are unaffected.
+========================================= */
+
+.performance-page {
+    --brand: #3f87b5;
+    --brand-dark: #2f76a7;
+    --brand-soft: #eaf3fa;
+    --ink: #1a2d3e;
+    --line: #e0e8f0;
+    --muted: #7a8794;
+}
+
+.performance-page .container {
+    max-width: 1100px;
+}
+
+
+/* =========================================
+   SIDEBAR + LAYOUT (desktop)
+========================================= */
+
+.performance-page .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    overflow-y: auto;
+    transition: width 0.3s ease, left 0.3s ease;
+}
+
+.performance-page .sidebar.collapsed {
+    width: 80px;
+}
+
+.performance-page .sidebar ul li a.active {
+    color: var(--brand);
+    border-left-color: var(--brand);
+    background: #f0f6fb;
+}
+
+.performance-page .main-content {
+    margin-left: 250px;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+.performance-page .main-content.expanded {
+    margin-left: 80px;
+}
+
+.performance-page .toggle-btn {
+    cursor: pointer;
+}
+
+.performance-page .sidebar-close-btn {
+    display: none;
+}
+
+.performance-page .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+}
+
+.performance-page .sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+.performance-page .mobile-menu {
+    display: none;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-size: 22px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.performance-page.no-scroll,
+body.no-scroll {
+    overflow: hidden;
+}
+
+
+/* =========================================
+   PAGE HEADER
+========================================= */
+
+.performance-page .page-title {
+    margin: 0 0 24px;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+
+/* =========================================
+   CLASS LIST (grid: 1 column -> 2 columns)
+========================================= */
+
+.performance-page .class-perf-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.performance-page .class-perf-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    margin: 0;
+    padding: 20px 24px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s, border-color 0.2s;
+}
+
+.performance-page .class-perf-card:hover {
+    color: inherit;
+    border-color: #cfdceb;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.performance-page .class-perf-card:focus-visible {
+    outline: 3px solid rgba(63, 135, 181, 0.35);
+    outline-offset: 2px;
+}
+
+.performance-page .card-left {
+    flex: 1;
+    min-width: 0;
+}
+
+.performance-page .card-left h5 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #2e2e2f;
+    overflow-wrap: anywhere;
+}
+
+.performance-page .card-left small {
+    display: block;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.performance-page .card-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.performance-page .meta-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    background: #f0f6fb;
+    color: var(--brand);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.performance-page .view-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-size: 14px;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.performance-page .class-perf-card:hover .view-arrow {
+    background: var(--ink);
+}
+
+/* Only lift cards on devices that can really hover */
+@media (hover: hover) {
+    .performance-page .class-perf-card:hover {
+        transform: translateY(-1px);
+    }
+    .performance-page .class-perf-card:hover .view-arrow {
+        transform: translateX(2px);
+    }
+}
+
+
+/* =========================================
+   EMPTY STATE
+========================================= */
+
+.performance-page .perf-empty {
+    padding: 60px 20px;
+    text-align: center;
+    color: #9aa7b3;
+}
+
+.performance-page .perf-empty i {
+    display: block;
+    margin-bottom: 14px;
+    font-size: 48px;
+    color: #c4ced8;
+}
+
+
+/* =========================================
+   WIDE SCREENS (>= 992px): two columns
+========================================= */
+
+@media (min-width: 992px) {
+    .performance-page .class-perf-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+}
+
+
+/* =========================================
+   TABLET AND MOBILE (<= 768px)
+========================================= */
+
+@media (max-width: 768px) {
+
+    /* Sidebar slides in from the left */
+    .performance-page .sidebar {
+        left: -250px;
+        width: 250px;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+        transition: left 0.3s ease;
+    }
+
+    .performance-page .sidebar.show {
+        left: 0;
+    }
+
+    .performance-page .sidebar.collapsed {
+        width: 250px;
+    }
+
+    .performance-page .sidebar.collapsed span {
+        display: inline;
+    }
+
+    .performance-page .toggle-btn {
+        display: none;
+    }
+
+    .performance-page .sidebar-header {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .performance-page .sidebar-close-btn {
+        display: block;
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-size: 21px;
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+
+    .performance-page .main-content,
+    .performance-page .main-content.expanded {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .performance-page .mobile-menu {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+    }
+
+    /* Topbar */
+    .performance-page .topbar {
+        height: 60px;
+        padding: 0 12px;
+    }
+
+    .performance-page .navbar-left {
+        gap: 8px;
+    }
+
+    .performance-page .navbar-logo {
+        height: 34px;
+    }
+
+    .performance-page .profile-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Content */
+    .performance-page .container.py-4 {
+        padding: 18px 14px 32px !important;
+    }
+
+    .performance-page .page-title {
+        margin-bottom: 18px;
+        font-size: 22px;
+    }
+
+    .performance-page .class-perf-card {
+        padding: 16px 18px;
+    }
+}
+
+
+/* =========================================
+   SMALL PHONES (<= 576px)
+   Keep one tidy row: name on the left, arrow on the right.
+   The "enrolled" pill repeats the student count, so it is hidden.
+========================================= */
+
+@media (max-width: 576px) {
+
+    .performance-page .class-perf-card {
+        gap: 12px;
+        padding: 15px 16px;
+    }
+
+    .performance-page .meta-pill {
+        display: none;
+    }
+
+    .performance-page .page-title {
+        font-size: 20px;
+    }
+
+    .performance-page .card-left h5 {
+        font-size: 15px;
+    }
+
+    .performance-page .card-left small {
+        font-size: 12.5px;
+    }
+
+    .performance-page .view-arrow {
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
+    }
+}
+
+
+/* =========================================
+   VERY SMALL PHONES (<= 360px)
+========================================= */
+
+@media (max-width: 360px) {
+
+    .performance-page .class-perf-card {
+        padding: 13px 14px;
+    }
+
+    .performance-page .navbar-logo {
+        height: 28px;
+    }
+
+    .performance-page .page-title {
+        font-size: 18px;
+    }
+
+    .performance-page .view-arrow {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+}
+
+
+/* =========================================
+   REDUCED MOTION
+========================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .performance-page .sidebar,
+    .performance-page .main-content,
+    .performance-page .class-perf-card,
+    .performance-page .view-arrow {
+        transition: none;
+    }
+}

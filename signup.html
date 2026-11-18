@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PLMUN Classroom — Signup</title>
+
+    <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="signup.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- HEADER -->
+        <div class="header">
+
+            <img src="img/plmun logo.png" alt="PLMUN Logo">
+
+            <div class="title">
+                <h1>PLMUN</h1>
+                <h2>CLASSROOM</h2>
+            </div>
+
+        </div>
+
+        <!-- SIGNUP FORM -->
+        <form action="signup.php" method="POST">
+
+            <div class="form-group">
+                <label for="name">Name</label>
+
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Enter your name"
+                    autocomplete="name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Enter your institutional email"
+                    autocomplete="email"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    placeholder="Confirm your password"
+                    autocomplete="new-password"
+                    required
+                >
+            </div>
+
+            <!-- ROLE SELECTION -->
+            <div class="role-selection">
+
+                <label class="role-option">
+                    <input
+                        type="radio"
+                        name="role"
+                        value="student"
+                        required
+                    >
+                    <span>Student</span>
+                </label>
+
+                <label class="role-option">
+                    <input
+                        type="radio"
+                        name="role"
+                        value="teacher"
+                    >
+                    <span>Teacher</span>
+                </label>
+
+            </div>
+
+            <!-- SIGNUP BUTTON -->
+            <button type="submit" class="signup-btn">
+                Signup
+            </button>
+
+            <!-- LOGIN LINK -->
+            <p class="login-link">
+                Already have an account?
+                <a href="index.html">Login</a>
+            </p>
+
+        </form>
+
+    </div>
+
+</body>
+</html>

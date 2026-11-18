@@ -1,0 +1,550 @@
+/* =========================================================
+   USER MANAGEMENT
+========================================================= */
+
+.users-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.users-title-row h2 {
+    margin: 0;
+    font-size: 27px;
+    font-weight: 700;
+    color: #111;
+}
+
+.add-user-btn {
+    border: none;
+    background: #3f87b5;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.add-user-btn:hover {
+    background: #356f96;
+}
+
+
+/* =========================================================
+   ALERT
+========================================================= */
+
+.user-alert {
+    background: #e9f8ee;
+    border: 1px solid #b9e6c7;
+    color: #26733d;
+    padding: 11px 15px;
+    margin-bottom: 18px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.user-alert i {
+    margin-right: 7px;
+}
+
+
+/* =========================================================
+   STATISTICS
+========================================================= */
+
+.user-statistics {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.user-stat-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    min-height: 110px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.user-stat-box span {
+    font-size: 15px;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 8px;
+}
+
+.user-stat-box strong {
+    font-size: 28px;
+    color: #111;
+}
+
+
+/* =========================================================
+   ROLE PERMISSIONS
+========================================================= */
+
+.permissions-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    margin-bottom: 30px;
+}
+
+.permissions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.permissions-header h3 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 600;
+}
+
+.save-permissions-btn {
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.save-permissions-btn:hover {
+    background: #f5f5f5;
+}
+
+
+.permission-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 0 15px 10px;
+}
+
+.permission-card {
+    border: 1px solid #ddd;
+    background: #fff;
+}
+
+.permission-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 17px;
+    border-bottom: 1px solid #eee;
+}
+
+.permission-card-header h4 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.permission-list {
+    padding: 12px 17px;
+}
+
+.permission-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 13px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.permission-item:last-child {
+    margin-bottom: 0;
+}
+
+.permission-item input {
+    width: 14px;
+    height: 14px;
+    accent-color: #7052a5;
+}
+
+
+/* =========================================================
+   ALL USERS
+========================================================= */
+
+.all-users-section {
+    background: #fff;
+    border: 1px solid #ddd;
+}
+
+.users-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px 10px;
+}
+
+.users-list-header h3 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 600;
+}
+
+.user-search {
+    width: 310px;
+    height: 38px;
+    border: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+}
+
+.user-search input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    outline: none;
+    padding: 0 12px;
+    font-size: 14px;
+}
+
+.user-search button {
+    width: 42px;
+    height: 100%;
+    border: none;
+    background: #fff;
+    color: #222;
+}
+
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.users-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 750px;
+}
+
+.users-table th {
+    background: #e5e5e5;
+    color: #222;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 9px 16px;
+    text-align: left;
+    border-bottom: 1px solid #d5d5d5;
+}
+
+.users-table td {
+    padding: 8px 16px;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+    color: #333;
+    vertical-align: middle;
+}
+
+.users-table tbody tr:hover {
+    background: #fafafa;
+}
+
+
+/* =========================================================
+   TABLE USER
+========================================================= */
+
+.table-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #d4dbe5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.table-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.table-avatar i {
+    color: #666;
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   PASSWORD
+========================================================= */
+
+.hidden-password {
+    letter-spacing: 2px;
+    color: #777;
+}
+
+
+/* =========================================================
+   ROLE SELECT
+========================================================= */
+
+.role-form {
+    margin: 0;
+}
+
+.role-form select {
+    width: 95px;
+    height: 30px;
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 2px 7px;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+
+.role-form select:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+
+/* =========================================================
+   ACTIONS
+========================================================= */
+
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-actions form {
+    margin: 0;
+}
+
+.edit-btn,
+.delete-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 3px;
+    font-size: 17px;
+}
+
+.edit-btn {
+    color: #42a5e8;
+}
+
+.edit-btn:hover {
+    color: #1689d2;
+}
+
+.delete-btn {
+    color: #ff4b4b;
+}
+
+.delete-btn:hover {
+    color: #dc2626;
+}
+
+
+/* =========================================================
+   NO USERS
+========================================================= */
+
+.no-users {
+    text-align: center !important;
+    padding: 30px !important;
+    color: #888 !important;
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
+
+.user-modal {
+    border: none;
+    border-radius: 8px;
+}
+
+.user-modal .modal-header {
+    border-bottom: 1px solid #eee;
+    padding: 18px 22px;
+}
+
+.user-modal .modal-title {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.user-modal .modal-body {
+    padding: 22px;
+}
+
+.form-group {
+    margin-bottom: 17px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 7px;
+}
+
+.form-group label small {
+    color: #888;
+    font-weight: 400;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0 11px;
+    outline: none;
+    font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: #3f87b5;
+}
+
+.user-modal .modal-footer {
+    border-top: 1px solid #eee;
+    padding: 14px 22px;
+}
+
+.cancel-btn {
+    border: 1px solid #ccc;
+    background: #fff;
+    padding: 8px 17px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.add-user-submit {
+    border: none;
+    background: #3f87b5;
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.add-user-submit:hover {
+    background: #356f96;
+}
+
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 1100px) {
+
+    .user-statistics {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .permission-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    .users-title-row {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .users-title-row h2 {
+        font-size: 22px;
+    }
+
+    .add-user-btn {
+        padding: 9px 13px;
+        white-space: nowrap;
+    }
+
+    .user-statistics {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .user-stat-box {
+        min-height: 85px;
+    }
+
+    .users-list-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 15px;
+    }
+
+    .user-search {
+        width: 100%;
+    }
+
+    .permissions-header {
+        gap: 10px;
+    }
+
+}
+
+
+/* =========================================================
+   SMALL PHONE
+========================================================= */
+
+@media (max-width: 480px) {
+
+    .users-title-row h2 {
+        font-size: 20px;
+    }
+
+    .add-user-btn {
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+
+    .permission-card-header h4 {
+        font-size: 18px;
+    }
+
+}

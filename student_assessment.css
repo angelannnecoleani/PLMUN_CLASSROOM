@@ -1,0 +1,1106 @@
+
+/* ============================================================
+   STUDENT ASSESSMENT PAGE
+   Responsive desktop, tablet, and mobile layouts
+   ============================================================ */
+
+:root {
+    --a-ink: #1a2d3e;
+    --a-muted: #64748b;
+    --a-line: #e8eef4;
+    --a-surface: #ffffff;
+    --a-primary: #3f87b5;
+    --a-primary-deep: #2f6690;
+    --a-success: #2f9e64;
+    --a-warn: #e08a2c;
+    --a-danger: #d64545;
+}
+
+/* ============================================================
+   GENERAL
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+.assessment-container {
+    width: 100%;
+    max-width: 1250px;
+    margin: 0 auto;
+    padding: 28px 30px;
+    min-width: 0;
+}
+
+.assess-flash,
+.assess-overview,
+.assess-card,
+.assess-empty,
+.assess-no-results {
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.assess-overview h3,
+.assess-card-heading h4 {
+    font-family: 'Sora', 'Segoe UI', Arial, sans-serif;
+}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    min-width: 0;
+}
+
+.navbar-left,
+.navbar-right {
+    display: flex;
+    align-items: center;
+}
+
+.navbar-left {
+    gap: 12px;
+    min-width: 0;
+}
+
+.navbar-logo {
+    width: auto;
+    height: 48px;
+    object-fit: contain;
+}
+
+.mobile-menu {
+    display: none;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--a-ink);
+    font-size: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.mobile-menu:hover {
+    background: #edf3f8;
+}
+
+.profile-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e9f1f7;
+    color: var(--a-primary);
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.profile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--a-primary);
+    font-size: 19px;
+}
+
+/* ============================================================
+   CLASS NAVIGATION
+   ============================================================ */
+
+.class-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0 30px;
+    border-bottom: 1px solid var(--a-line);
+    background: #fff;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.class-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.class-nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 12px 18px;
+    color: var(--a-muted);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.class-nav a:hover {
+    color: var(--a-primary);
+}
+
+.class-nav a.nav-active {
+    color: var(--a-primary);
+    border-bottom-color: var(--a-primary);
+}
+
+/* ============================================================
+   FLASH MESSAGE
+   ============================================================ */
+
+.assess-flash {
+    background: #eaf6ec;
+    color: #1e7a34;
+    border: 1px solid #cdeed3;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   OVERVIEW PANEL
+   ============================================================ */
+
+.assess-overview {
+    width: 100%;
+    background: linear-gradient(135deg, #eef4f9 0%, #f7fafc 100%);
+    border: 1px solid var(--a-line);
+    border-radius: 16px;
+    padding: 22px 26px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+/* Progress ring */
+
+.assess-ring {
+    position: relative;
+    width: 84px;
+    height: 84px;
+    flex-shrink: 0;
+}
+
+.assess-ring svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transform: rotate(-90deg);
+}
+
+.ring-track {
+    fill: none;
+    stroke: #dbe6ee;
+    stroke-width: 9;
+}
+
+.ring-fill {
+    fill: none;
+    stroke: var(--a-primary);
+    stroke-width: 9;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.6s ease;
+}
+
+.assess-ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+}
+
+.assess-ring-label strong {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--a-ink);
+}
+
+.assess-ring-label span {
+    font-size: 10px;
+    color: var(--a-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Overview text */
+
+.assess-overview-text {
+    flex: 1;
+    min-width: 180px;
+}
+
+.assess-overview-text h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--a-ink);
+    margin: 0 0 4px;
+}
+
+.assess-overview-text p {
+    font-size: 13.5px;
+    color: var(--a-muted);
+    margin: 0;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.assess-overview-text small {
+    display: inline-block;
+    margin-top: 5px;
+}
+
+/* ============================================================
+   FILTER CHIPS
+   ============================================================ */
+
+.assess-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.filter-chip {
+    border: 1px solid var(--a-line);
+    background: #fff;
+    color: var(--a-muted);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.filter-chip:hover {
+    border-color: var(--a-primary);
+    color: var(--a-primary);
+}
+
+.filter-chip.active {
+    background: var(--a-primary);
+    border-color: var(--a-primary);
+    color: #fff;
+}
+
+.filter-chip .count {
+    background: rgba(0, 0, 0, .08);
+    border-radius: 999px;
+    font-size: 11px;
+    padding: 1px 7px;
+}
+
+.filter-chip.active .count {
+    background: rgba(255, 255, 255, .25);
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.assess-empty,
+.assess-no-results {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--a-line);
+    border-radius: 14px;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--a-muted);
+}
+
+.assess-empty i,
+.assess-no-results i {
+    font-size: 36px;
+    color: #c3d2de;
+    margin-bottom: 14px;
+    display: block;
+}
+
+.assess-empty h5 {
+    color: var(--a-ink);
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.assess-empty p,
+.assess-no-results p {
+    font-size: 13.5px;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ============================================================
+   ASSIGNMENT CARD
+   ============================================================ */
+
+.assess-card {
+    width: 100%;
+    min-width: 0;
+    background: var(--a-surface);
+    border: 1px solid var(--a-line);
+    border-radius: 14px;
+    margin-bottom: 14px;
+    display: flex;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(20, 40, 60, .04);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.assess-card:hover {
+    box-shadow: 0 6px 20px rgba(20, 40, 60, .08);
+    transform: translateY(-1px);
+}
+
+.assess-stripe {
+    width: 5px;
+    flex-shrink: 0;
+}
+
+.assess-card-body {
+    padding: 18px 22px;
+    flex: 1;
+    min-width: 0;
+}
+
+.assess-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    min-width: 0;
+}
+
+.assess-type-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* Assignment details */
+
+.assess-card-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.assessment-title-link {
+    display: inline-block;
+    max-width: 100%;
+    text-decoration: none;
+}
+
+.assess-card-heading h4 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--a-ink);
+    margin: 0 0 5px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    transition: color 0.15s ease;
+}
+
+.assessment-title-link:hover h4 {
+    color: var(--a-primary);
+}
+
+.assess-meta {
+    font-size: 12.5px;
+    color: var(--a-muted);
+    text-transform: capitalize;
+    line-height: 1.5;
+}
+
+.meta-dot {
+    margin: 0 5px;
+}
+
+/* Due date chip */
+
+.due-chip {
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 6px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.chip-ok {
+    background: #eaf2f8;
+    color: var(--a-primary-deep);
+}
+
+.chip-warn {
+    background: #fdf1e2;
+    color: #a35f10;
+}
+
+.chip-urgent {
+    background: #fdece7;
+    color: #c14a1f;
+}
+
+.chip-overdue {
+    background: #fbe7e7;
+    color: var(--a-danger);
+}
+
+.chip-neutral {
+    background: #f1f3f5;
+    color: var(--a-muted);
+}
+
+.chip-submitted {
+    background: #eaf2f8;
+    color: var(--a-primary-deep);
+}
+
+.chip-done {
+    background: #e7f6ec;
+    color: var(--a-success);
+}
+
+.due-chip.chip-late {
+    background: #fdecea;
+    color: #c0392b;
+}
+
+/* ============================================================
+   INSTRUCTIONS
+   ============================================================ */
+
+.assess-instructions {
+    font-size: 13.5px;
+    color: #40566a;
+    margin: 12px 0 0 54px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   CARD FOOTER / ACTIONS
+   ============================================================ */
+
+.assess-card-footer {
+    margin: 16px 0 0 54px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.assess-result {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.assess-result-done {
+    color: var(--a-success);
+}
+
+.assess-result-submitted {
+    color: var(--a-primary-deep);
+}
+
+.assess-file-link {
+    color: var(--a-primary);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 4px;
+    overflow-wrap: anywhere;
+}
+
+.assess-file-link:hover {
+    text-decoration: underline;
+}
+
+/* Upload form */
+
+.assess-upload {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.assess-upload-compact {
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px dashed var(--a-line);
+}
+
+.file-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px dashed #c3d2de;
+    background: #f8fafc;
+    color: var(--a-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+    max-width: 220px;
+    min-width: 0;
+}
+
+.file-pill:hover {
+    border-color: var(--a-primary);
+    color: var(--a-primary);
+}
+
+.file-pill input[type="file"] {
+    display: none;
+}
+
+.file-pill-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-mini {
+    border: none;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 9px 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-mini:active {
+    transform: scale(0.97);
+}
+
+.btn-mini-primary {
+    background: var(--a-primary);
+    color: #fff;
+}
+
+.btn-mini-primary:hover {
+    background: var(--a-primary-deep);
+}
+
+.btn-mini-ghost {
+    background: transparent;
+    color: var(--a-muted);
+    border: 1px solid var(--a-line);
+}
+
+.btn-mini-ghost:hover {
+    color: var(--a-success);
+    border-color: var(--a-success);
+}
+
+/* ============================================================
+   SIDEBAR MOBILE OVERLAY
+   ============================================================ */
+
+.sidebar-overlay {
+    display: none;
+}
+
+/* ============================================================
+   TABLET RESPONSIVENESS
+   ============================================================ */
+
+@media (max-width: 992px) {
+
+    .assessment-container {
+        padding: 24px 22px;
+    }
+
+    .assess-overview {
+        gap: 18px;
+        padding: 20px;
+    }
+
+    .assess-filters {
+        width: 100%;
+    }
+
+    .class-nav {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+
+}
+
+/* ============================================================
+   MOBILE RESPONSIVENESS
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* Main content */
+
+    .main-content {
+        width: 100% !important;
+        margin-left: 0 !important;
+        min-width: 0;
+    }
+
+    .assessment-container {
+        width: 100%;
+        padding: 20px 16px;
+    }
+
+    /* Topbar */
+
+    .topbar {
+        width: 100%;
+        min-height: 65px;
+        padding: 10px 16px;
+        gap: 10px;
+    }
+
+    .mobile-menu {
+        display: inline-flex !important;
+    }
+
+    .navbar-logo {
+        max-width: 155px;
+        max-height: 40px;
+    }
+
+    .profile-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    /* Sidebar drawer */
+
+    .sidebar {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 260px !important;
+        max-width: 85vw;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    /* Center sidebar toggle button */
+
+    .sidebar .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 65px;
+        padding: 10px 15px;
+    }
+
+    .sidebar .toggle-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: transparent;
+        color: #333;
+        font-size: 20px;
+        cursor: pointer;
+        border-radius: 8px;
+    }
+
+    .sidebar .toggle-btn:hover {
+        background: rgba(0, 0, 0, 0.08);
+    }
+
+    /* Sidebar overlay */
+
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 1090;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .sidebar-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Class navigation */
+
+    .class-nav {
+        width: 100%;
+        padding: 0 12px;
+        gap: 2px;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .class-nav a {
+        min-height: 46px;
+        padding: 11px 14px;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    /* Overview */
+
+    .assess-overview {
+        padding: 20px;
+        gap: 16px;
+    }
+
+    .assess-ring {
+        width: 76px;
+        height: 76px;
+    }
+
+    .assess-overview-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .assess-overview-text h3 {
+        font-size: 19px;
+    }
+
+    .assess-overview-text p {
+        font-size: 13px;
+    }
+
+    .assess-filters {
+        width: 100%;
+        gap: 8px;
+    }
+
+    .filter-chip {
+        font-size: 12px;
+        padding: 7px 12px;
+    }
+
+    /* Assignment card */
+
+    .assess-card-body {
+        padding: 16px;
+    }
+
+    .assess-card-top {
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .assess-type-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    .assess-card-heading h4 {
+        font-size: 15px;
+    }
+
+    .due-chip {
+        margin-left: 50px;
+        margin-top: 2px;
+    }
+
+    .assess-instructions,
+    .assess-card-footer {
+        margin-left: 0;
+    }
+
+}
+
+/* ============================================================
+   SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 576px) {
+
+    .assessment-container {
+        padding: 17px 13px;
+    }
+
+    .topbar {
+        padding: 9px 13px;
+    }
+
+    .navbar-logo {
+        max-width: 130px;
+        max-height: 36px;
+    }
+
+    .class-nav {
+        padding: 0 8px;
+    }
+
+    .class-nav a {
+        min-height: 44px;
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    /* Overview panel */
+
+    .assess-overview {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+        padding: 18px;
+        gap: 14px;
+        border-radius: 13px;
+    }
+
+    .assess-ring {
+        width: 72px;
+        height: 72px;
+    }
+
+    .assess-ring-label strong {
+        font-size: 16px;
+    }
+
+    .assess-overview-text {
+        width: 100%;
+    }
+
+    .assess-overview-text h3 {
+        font-size: 18px;
+    }
+
+    .assess-overview-text p {
+        font-size: 12.5px;
+    }
+
+    /* Filter buttons */
+
+    .assess-filters {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+    }
+
+    .filter-chip {
+        width: 100%;
+        min-height: 36px;
+        font-size: 12px;
+        padding: 7px 9px;
+    }
+
+    /* Assignment cards */
+
+    .assess-card {
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+
+    .assess-card-body {
+        padding: 14px;
+    }
+
+    .assess-card-top {
+        display: grid;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+    }
+
+    .assess-type-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 15px;
+    }
+
+    .assess-card-heading {
+        min-width: 0;
+    }
+
+    .assess-card-heading h4 {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .assess-meta {
+        font-size: 11.5px;
+    }
+
+    .due-chip {
+        grid-column: 2;
+        justify-self: start;
+        margin: 0;
+        font-size: 10.5px;
+        padding: 5px 10px;
+        white-space: normal;
+        max-width: 100%;
+    }
+
+    .assess-instructions {
+        font-size: 12.5px;
+        margin: 12px 0 0;
+    }
+
+    .assess-card-footer {
+        margin: 13px 0 0;
+        gap: 8px;
+    }
+
+    .assess-result {
+        font-size: 12px;
+    }
+
+    .assess-upload {
+        width: 100%;
+        align-items: stretch;
+    }
+
+    .file-pill {
+        max-width: 100%;
+        flex: 1;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    .btn-mini {
+        font-size: 11.5px;
+        padding: 8px 12px;
+    }
+
+    /* Empty state */
+
+    .assess-empty,
+    .assess-no-results {
+        padding: 42px 16px;
+    }
+
+    .assess-empty i,
+    .assess-no-results i {
+        font-size: 32px;
+    }
+
+    .assess-empty h5 {
+        font-size: 16px;
+    }
+
+    .assess-empty p,
+    .assess-no-results p {
+        font-size: 12.5px;
+    }
+
+    .assess-flash {
+        font-size: 12.5px;
+        padding: 11px 13px;
+    }
+
+}
+
+/* ============================================================
+   EXTRA SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+    .assessment-container {
+        padding: 15px 10px;
+    }
+
+    .navbar-logo {
+        max-width: 115px;
+    }
+
+    .class-nav a {
+        padding: 9px 10px;
+        font-size: 11.5px;
+    }
+
+    .assess-overview {
+        padding: 15px;
+    }
+
+    .filter-chip {
+        font-size: 11px;
+        padding: 7px 6px;
+    }
+
+    .assess-card-body {
+        padding: 12px;
+    }
+
+    .assess-card-heading h4 {
+        font-size: 13px;
+    }
+
+    .assess-meta {
+        font-size: 10.5px;
+    }
+
+    .due-chip {
+        font-size: 10px;
+    }
+
+}

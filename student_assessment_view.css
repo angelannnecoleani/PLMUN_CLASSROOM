@@ -1,0 +1,1223 @@
+/* ============================================================
+   ASSESSMENT DETAIL PAGE
+   ============================================================ */
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    color: #555;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    margin-bottom: 18px;
+    transition: color 0.2s;
+}
+.back-link:hover { color: #3f87b5; }
+
+/* ── Header ── */
+.assess-header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07);
+}
+
+.assess-header-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #fff;
+    flex-shrink: 0;
+}
+.assess-header-icon.icon-assignment { background: #3f87b5; }
+.assess-header-icon.icon-quiz       { background: #7b5fc4; }
+
+.assess-header-body h3 {
+    font-weight: 700;
+    font-size: 21px;
+    color: #1a2d3e;
+    margin-bottom: 6px;
+}
+
+.assess-header-meta {
+    font-size: 13px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.assess-header-meta .dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #ccc;
+}
+
+/* ── Panels ── */
+.assess-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07);
+}
+
+.assess-instructions {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #333;
+    white-space: pre-wrap;
+}
+
+.assess-resource-link,
+.assess-resource-file {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 14px;
+    margin-right: 10px;
+    padding: 8px 16px;
+    font-size: 13.5px;
+    color: #3f87b5;
+    background: #f0f6fb;
+    border: 1px solid #cde0ef;
+    border-radius: 8px;
+    text-decoration: none;
+    word-break: break-all;
+    transition: background 0.2s;
+}
+.assess-resource-link:hover,
+.assess-resource-file:hover { background: #daeaf5; color: #2f76a7; }
+
+.assess-resource-image {
+    display: block;
+    max-width: 280px;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-top: 14px;
+    border: 1px solid #eee;
+}
+
+/* ── Your Work panel ── */
+.your-work-panel {
+    position: sticky;
+    top: 86px;
+}
+
+.your-work-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: #1a2d3e;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 16px;
+}
+
+.status-pill {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+.status-pill.status-assigned { background: #eef1f5; color: #667; }
+.status-pill.status-done     { background: #e3f6e8; color: #1e8a44; }
+.status-pill.status-missing  { background: #fdeaea; color: #d9302f; }
+.status-pill.status-late {  background: #fdecea; color: #c0392b;}
+
+.grade-box {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.grade-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: #1e8a44;
+}
+.grade-max {
+    font-size: 14px;
+    color: #888;
+    font-weight: 600;
+}
+
+.submitted-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.submitted-file {
+    display: flex;
+    align-items: center;
+    font-size: 13.5px;
+    color: #3f87b5;
+    background: #f0f6fb;
+    border: 1px solid #cde0ef;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-decoration: none;
+    word-break: break-all;
+    transition: background 0.2s;
+}
+.submitted-file:hover { background: #daeaf5; color: #2f76a7; }
+
+.attach-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1.5px dashed #cfd8e3;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    color: #555;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+.attach-box:hover { border-color: #3f87b5; background: #f7fbfd; }
+.attach-box i { color: #3f87b5; font-size: 16px; }
+
+@media (max-width: 991px) {
+    .your-work-panel { position: static; }
+}
+
+/* ── Attachment list (pending "turn in" queue) ── */
+.attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.attachment-list:empty { margin-bottom: 0; }
+
+/* Scroll instead of growing forever once the list gets long (up to 10 items) */
+.attachment-list:not(:empty) {
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f7f9fb;
+    border: 1px solid #e6ebf0;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.attachment-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.attachment-icon {
+    width: 32px;
+    flex-shrink: 0;
+    text-align: center;
+    color: #3f87b5;
+    font-size: 15px;
+}
+
+.attachment-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.attachment-remove {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: #eef1f5;
+    color: #888;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.attachment-remove:hover { background: #fdeaea; color: #d9302f; }
+
+/* ── Add files / add link controls ── */
+.attach-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.attach-link-row {
+    display: flex;
+    gap: 6px;
+}
+.attach-link-row input { flex: 1; }
+
+.attach-count-msg {
+    font-size: 12px;
+    color: #888;
+    margin-top: 8px;
+}
+
+
+/* =========================================================
+   STUDENT ASSESSMENT VIEW
+   RESPONSIVE DESIGN
+   Desktop | Tablet | Mobile
+========================================================= */
+
+/* =========================================================
+   GLOBAL
+========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+body {
+    background: #f8f9fa;
+}
+
+body.no-scroll {
+    overflow: hidden;
+}
+
+img {
+    max-width: 100%;
+}
+
+.main-content {
+    min-width: 0;
+}
+
+.main-content .container {
+    min-width: 0;
+}
+
+/* Prevent Bootstrap columns and long content from overflowing */
+
+.row > * {
+    min-width: 0;
+}
+
+/* =========================================================
+   DESKTOP SIDEBAR
+========================================================= */
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1050;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.main-content {
+    width: calc(100% - 250px);
+    margin-left: 250px;
+    min-height: 100vh;
+    transition: width 0.3s ease, margin-left 0.3s ease;
+}
+
+.main-content.expanded {
+    width: calc(100% - 80px);
+    margin-left: 80px;
+}
+
+/* =========================================================
+   TOPBAR
+========================================================= */
+
+.topbar {
+    width: 100%;
+    min-height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 10px 25px;
+}
+
+.navbar-left,
+.navbar-right {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.navbar-left {
+    gap: 15px;
+}
+
+.navbar-logo {
+    display: block;
+    width: auto;
+    max-width: 190px;
+    max-height: 45px;
+    object-fit: contain;
+}
+
+.mobile-menu {
+    display: none;
+    border: none;
+    background: transparent;
+    font-size: 23px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.profile-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 50%;
+}
+
+.profile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.profile-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* =========================================================
+   CLASS NAVIGATION
+========================================================= */
+
+.class-nav {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    gap: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.class-nav a {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* =========================================================
+   MAIN CONTAINER
+========================================================= */
+
+.main-content > .container {
+    width: 100%;
+    max-width: 1200px;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    flex-wrap: wrap;
+    font-size: 14px;
+}
+
+/* =========================================================
+   ASSESSMENT HEADER
+========================================================= */
+
+.assess-header {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 22px 24px;
+}
+
+.assess-header-icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+}
+
+.assess-header-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.assess-header-body h3 {
+    font-size: 21px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.assess-header-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+.assess-header-meta span {
+    overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   ASSESSMENT CONTENT GRID
+========================================================= */
+
+.main-content .row.g-4 {
+    align-items: flex-start;
+}
+
+.main-content .col-lg-8,
+.main-content .col-lg-4 {
+    min-width: 0;
+}
+
+/* =========================================================
+   ASSESSMENT PANELS
+========================================================= */
+
+.assess-panel {
+    width: 100%;
+    min-width: 0;
+    padding: 24px;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+}
+
+.assess-instructions {
+    width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+    line-height: 1.7;
+}
+
+.your-work-panel {
+    position: sticky;
+    top: 86px;
+    min-width: 0;
+}
+
+.your-work-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* =========================================================
+   STATUS AND GRADE
+========================================================= */
+
+.status-pill {
+    flex-shrink: 0;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+}
+
+.grade-box {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* =========================================================
+   TEACHER ATTACHMENTS
+========================================================= */
+
+.assess-img-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    width: 100%;
+}
+
+.assess-img-grid a {
+    display: block;
+    min-width: 0;
+}
+
+.assess-img-grid img {
+    display: block;
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.assess-attach-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.assess-attach-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 11px 14px;
+    border-radius: 9px;
+}
+
+.assess-attach-item span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.assess-attach-item i {
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   SUBMITTED ATTACHMENTS
+========================================================= */
+
+.submitted-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.submitted-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.submitted-file i {
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   ATTACHMENT UPLOAD CONTROLS
+========================================================= */
+
+.attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
+.attachment-list:not(:empty) {
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: 3px;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+}
+
+.attachment-thumb {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.attachment-icon {
+    width: 32px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.attachment-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-remove {
+    flex-shrink: 0;
+}
+
+.attach-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.attach-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 45px;
+    cursor: pointer;
+}
+
+.attach-link-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+}
+
+.attach-link-row input {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+}
+
+.attach-link-row button {
+    flex-shrink: 0;
+}
+
+.attach-count-msg {
+    overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.your-work-panel .btn {
+    min-height: 40px;
+    white-space: normal;
+}
+
+.your-work-panel .btn:disabled {
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   TABLET - 992px AND BELOW
+========================================================= */
+
+@media (max-width: 991.98px) {
+
+    .main-content > .container {
+        max-width: 100%;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    .your-work-panel {
+        position: static;
+        top: auto;
+    }
+
+    .assess-panel {
+        padding: 20px;
+    }
+
+    .assess-header {
+        padding: 20px;
+    }
+
+}
+
+/* =========================================================
+   MOBILE - 768px AND BELOW
+========================================================= */
+
+@media (max-width: 768px) {
+
+    /* SIDEBAR DRAWER */
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px !important;
+        max-width: 85vw;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar.collapsed {
+        width: 260px !important;
+    }
+
+    .sidebar span,
+    .sidebar.collapsed span {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .sidebar ul li a,
+    .sidebar.collapsed ul li a {
+        justify-content: flex-start;
+    }
+
+    /* SIDEBAR OVERLAY */
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1090;
+    }
+
+    .sidebar-overlay.show {
+        display: block;
+    }
+
+    /* MAIN CONTENT */
+
+    .main-content,
+    .main-content.expanded {
+        width: 100% !important;
+        margin-left: 0 !important;
+        min-width: 0;
+    }
+
+    /* TOPBAR */
+
+    .topbar {
+        min-height: 60px;
+        padding: 9px 16px;
+        gap: 10px;
+    }
+
+    .navbar-left {
+        gap: 12px;
+    }
+
+    .mobile-menu {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .navbar-logo {
+        max-width: 155px;
+        max-height: 38px;
+    }
+
+    .profile-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    /* CLASS NAVIGATION */
+
+    .class-nav {
+        gap: 0;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .class-nav a {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    /* PAGE CONTAINER */
+
+    .main-content > .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 20px 16px !important;
+    }
+
+    .back-link {
+        margin-bottom: 15px;
+        font-size: 13px;
+    }
+
+    /* ASSESSMENT HEADER */
+
+    .assess-header {
+        align-items: flex-start;
+        gap: 13px;
+        padding: 17px;
+        border-radius: 10px;
+    }
+
+    .assess-header-icon {
+        width: 46px;
+        height: 46px;
+        font-size: 19px;
+    }
+
+    .assess-header-body h3 {
+        font-size: 18px;
+        margin-bottom: 7px;
+    }
+
+    .assess-header-meta {
+        gap: 6px;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    /* STACK CONTENT */
+
+    .main-content .row.g-4 {
+        --bs-gutter-y: 16px;
+        --bs-gutter-x: 0;
+    }
+
+    .main-content .col-lg-8,
+    .main-content .col-lg-4 {
+        width: 100%;
+    }
+
+    /* PANELS */
+
+    .assess-panel {
+        padding: 18px;
+        border-radius: 10px;
+    }
+
+    .assess-instructions {
+        font-size: 14px;
+    }
+
+    .your-work-panel {
+        position: static;
+    }
+
+    .your-work-header {
+        font-size: 14px;
+    }
+
+    /* ATTACHMENT IMAGES */
+
+    .assess-img-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 8px;
+    }
+
+    .assess-img-grid img {
+        height: 115px;
+    }
+
+    .assess-attach-title {
+        font-size: 12px;
+        margin: 17px 0 9px;
+    }
+
+    .assess-attach-item {
+        padding: 10px 11px;
+        font-size: 13px;
+    }
+
+    /* SUBMITTED FILES */
+
+    .submitted-file {
+        padding: 10px 11px;
+        font-size: 13px;
+    }
+
+    /* UPLOAD CONTROLS */
+
+    .attach-box {
+        padding: 11px 12px;
+        font-size: 13px;
+    }
+
+    .attach-link-row {
+        gap: 5px;
+    }
+
+    .attach-link-row input {
+        font-size: 13px;
+    }
+
+    .attach-link-row button {
+        padding: 6px 11px;
+    }
+
+    .attachment-name {
+        font-size: 12px;
+    }
+
+    /* BUTTONS */
+
+    .your-work-panel .btn {
+        min-height: 42px;
+        font-size: 13px;
+    }
+
+}
+
+/* =========================================================
+   SMALL MOBILE - 576px AND BELOW
+========================================================= */
+
+@media (max-width: 576px) {
+
+    .topbar {
+        min-height: 56px;
+        padding: 8px 12px;
+    }
+
+    .navbar-logo {
+        max-width: 135px;
+        max-height: 34px;
+    }
+
+    .mobile-menu {
+        font-size: 21px;
+    }
+
+    .profile-icon {
+        width: 35px;
+        height: 35px;
+    }
+
+    .class-nav a {
+        padding: 11px 12px;
+        font-size: 13px;
+    }
+
+    .main-content > .container {
+        padding: 17px 12px !important;
+    }
+
+    /* HEADER */
+
+    .assess-header {
+        gap: 11px;
+        padding: 14px;
+    }
+
+    .assess-header-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 17px;
+    }
+
+    .assess-header-body h3 {
+        font-size: 16px;
+    }
+
+    .assess-header-meta {
+        font-size: 11px;
+        gap: 5px;
+    }
+
+    /* PANELS */
+
+    .assess-panel {
+        padding: 15px;
+    }
+
+    .assess-instructions {
+        font-size: 13.5px;
+        line-height: 1.65;
+    }
+
+    /* IMAGE ATTACHMENTS */
+
+    .assess-img-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .assess-img-grid img {
+        height: 125px;
+    }
+
+    /* FILES AND LINKS */
+
+    .assess-attach-item {
+        gap: 8px;
+        padding: 10px;
+        font-size: 12px;
+    }
+
+    .assess-attach-item i {
+        font-size: 15px;
+    }
+
+    .assess-attach-item .open-icon {
+        font-size: 11px;
+    }
+
+    /* WORK PANEL */
+
+    .your-work-header {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .status-pill {
+        font-size: 11px;
+        padding: 4px 9px;
+    }
+
+    .grade-value {
+        font-size: 23px;
+    }
+
+    .attach-link-row input {
+        font-size: 12px;
+    }
+
+    .attach-link-row button {
+        font-size: 12px;
+    }
+
+}
+
+/* =========================================================
+   EXTRA SMALL MOBILE - 400px AND BELOW
+========================================================= */
+
+@media (max-width: 400px) {
+
+    .navbar-logo {
+        max-width: 115px;
+    }
+
+    .main-content > .container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .assess-header {
+        padding: 12px;
+        gap: 9px;
+    }
+
+    .assess-header-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 15px;
+    }
+
+    .assess-header-body h3 {
+        font-size: 15px;
+    }
+
+    .assess-header-meta {
+        font-size: 10.5px;
+    }
+
+    .assess-panel {
+        padding: 13px;
+    }
+
+    .assess-img-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .assess-img-grid img {
+        height: 105px;
+    }
+
+    .attach-link-row {
+        flex-wrap: wrap;
+    }
+
+    .attach-link-row input {
+        width: 100%;
+        min-width: 0;
+    }
+
+}
+
+/* =========================================================
+   ACCESSIBILITY AND INTERACTION
+========================================================= */
+
+button,
+a,
+label {
+    -webkit-tap-highlight-color: transparent;
+}
+
+input,
+button {
+    max-width: 100%;
+}
+
+#yourWorkMsg {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}

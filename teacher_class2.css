@@ -1,0 +1,592 @@
+/* =========================================================
+   TEACHER TO REVIEW - RESPONSIVE LAYOUT
+   Append this section at the bottom of teacher_class.css
+========================================================= */
+
+/* Prevent horizontal scrolling */
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.main-content {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.sidebar-close-btn {
+    display: none;
+    border: 0;
+    background: transparent;
+    color: #333;
+    font-size: 23px;
+    cursor: pointer;
+}
+
+/* Main content */
+.assessment-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.assessment-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.topic-filter-wrap {
+    position: relative;
+    width: 220px;
+    max-width: 100%;
+}
+
+.topic-filter-select {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Class accordion */
+.topic-block {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.topic-header-bar {
+    width: 100%;
+    min-width: 0;
+}
+
+.topic-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.topic-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.topic-body {
+    width: 100%;
+    min-width: 0;
+}
+
+.topic-body.collapsed {
+    display: none;
+}
+
+/* Assessment item */
+.assessment-item {
+    width: 100%;
+    min-width: 0;
+    padding: 18px 20px;
+}
+
+.assessment-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+}
+
+.assessment-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.assessment-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.assessment-due-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.assessment-stats-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 14px;
+}
+
+.stat-cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.stat-cell strong,
+.stat-cell span {
+    white-space: nowrap;
+}
+
+/* Empty state */
+.empty-state {
+    width: 100%;
+    padding: 45px 20px;
+    text-align: center;
+}
+
+/* Overlay */
+.sidebar-overlay {
+    display: none;
+}
+
+/* =========================================================
+   TABLET AND MOBILE
+========================================================= */
+
+@media (max-width: 768px) {
+
+    /* Sidebar becomes off-canvas */
+    .sidebar {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 260px !important;
+        max-width: 85vw;
+        height: 100dvh;
+        z-index: 1001;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar.collapsed {
+        width: 260px !important;
+    }
+
+    .sidebar.collapsed span {
+        display: inline !important;
+    }
+
+    .sidebar.collapsed ul li a,
+    .sidebar.collapsed .logout-btn a {
+        justify-content: flex-start;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .sidebar-header {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        padding: 12px 15px;
+    }
+
+    .toggle-btn {
+        display: none !important;
+    }
+
+    .sidebar-close-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 6px;
+    }
+
+    .sidebar-close-btn:hover {
+        background: #f1f1f1;
+    }
+
+    /* Sidebar overlay */
+    .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.4);
+        opacity: 0;
+        visibility: hidden;
+        display: block;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .sidebar-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Main content fills screen */
+    .main-content,
+    .main-content.expanded {
+        width: 100% !important;
+        max-width: 100%;
+        margin-left: 0 !important;
+    }
+
+    /* Topbar */
+    .topbar {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 15px;
+    }
+
+    .navbar-left {
+        min-width: 0;
+        gap: 12px;
+    }
+
+    .navbar-logo {
+        max-width: 170px;
+        height: auto;
+        object-fit: contain;
+    }
+
+    .mobile-menu {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .navbar-right {
+        flex-shrink: 0;
+    }
+
+    /* Review navigation */
+    .class-nav {
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .class-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .class-nav a {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    /* Page spacing */
+    .container.py-4 {
+        width: 100%;
+        max-width: 100%;
+        padding: 20px 16px !important;
+    }
+
+    .assessment-page {
+        padding: 0;
+    }
+
+    .assessment-actions {
+        justify-content: flex-start;
+    }
+
+    .topic-filter-wrap {
+        width: 100%;
+        max-width: 300px;
+    }
+
+    /* Assessment layout */
+    .assessment-item {
+        padding: 16px;
+    }
+
+    .assessment-top-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .assessment-title-wrap {
+        width: 100%;
+    }
+
+    .assessment-due-wrap {
+        justify-content: flex-start;
+        text-align: left;
+        padding-left: 30px;
+    }
+
+    .assessment-stats-row {
+        gap: 12px 20px;
+    }
+}
+
+/* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+@media (max-width: 576px) {
+
+    .topbar {
+        min-height: 58px;
+        padding: 0 12px;
+    }
+
+    .navbar-logo {
+        max-width: 140px;
+        max-height: 36px;
+    }
+
+    .navbar-left {
+        gap: 9px;
+    }
+
+    .navbar-right {
+        gap: 8px;
+    }
+
+    .mobile-menu {
+        font-size: 19px;
+    }
+
+    .profile-icon {
+        width: 35px;
+        height: 35px;
+        min-width: 35px;
+    }
+
+    /* Tabs */
+    .class-nav {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .class-nav a {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+
+    /* Main page */
+    .container.py-4 {
+        padding: 16px 12px !important;
+    }
+
+    .assessment-actions {
+        margin-bottom: 15px;
+    }
+
+    .topic-filter-wrap {
+        width: 100%;
+        max-width: none;
+    }
+
+    .topic-filter-select {
+        min-height: 42px;
+        font-size: 14px;
+    }
+
+    /* Class header */
+    .topic-header-bar {
+        padding: 13px 14px;
+    }
+
+    .topic-header-left {
+        gap: 9px;
+    }
+
+    .topic-name {
+        font-size: 15px;
+        line-height: 1.4;
+    }
+
+    /* Assessment card */
+    .assessment-item {
+        padding: 14px 12px;
+    }
+
+    .assessment-title-wrap {
+        gap: 9px;
+        align-items: flex-start;
+    }
+
+    .assessment-icon {
+        flex-shrink: 0;
+        margin-top: 3px;
+    }
+
+    .assessment-title {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .assessment-due-wrap {
+        padding-left: 25px;
+        font-size: 12px;
+        flex-wrap: wrap;
+    }
+
+    .assessment-stats-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 8px;
+        margin-top: 14px;
+    }
+
+    .posted-label {
+        grid-column: 1 / -1;
+        width: fit-content;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .stat-cell {
+        gap: 5px;
+        min-width: 0;
+        flex-wrap: wrap;
+        font-size: 12px;
+    }
+
+    .stat-cell strong {
+        font-size: 14px;
+    }
+
+    .stat-cell span {
+        font-size: 12px;
+    }
+
+    .empty-state {
+        padding: 35px 15px;
+    }
+
+    .empty-state p {
+        font-size: 14px;
+    }
+}
+
+/* =========================================================
+   EXTRA SMALL PHONES
+========================================================= */
+
+@media (max-width: 360px) {
+
+    .navbar-logo {
+        max-width: 115px;
+    }
+
+    .topbar {
+        padding: 0 9px;
+    }
+
+    .container.py-4 {
+        padding: 14px 9px !important;
+    }
+
+    .class-nav a {
+        padding: 11px 13px;
+        font-size: 13px;
+    }
+
+    .topic-header-bar {
+        padding: 12px 10px;
+    }
+
+    .topic-name {
+        font-size: 14px;
+    }
+
+    .assessment-item {
+        padding: 12px 10px;
+    }
+
+    .assessment-stats-row {
+        column-gap: 5px;
+    }
+
+    .stat-cell {
+        font-size: 11px;
+    }
+
+    .stat-cell strong {
+        font-size: 13px;
+    }
+}
+
+/* =========================================================
+   TOPIC BODY SPACING
+========================================================= */
+
+.topic-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #f8fafc;
+}
+
+/* Individual assessment spacing */
+.assessment-item {
+    margin: 0 !important;
+    padding: 18px 20px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+}
+
+/* Space between title/due date and statistics */
+.assessment-top-row {
+    margin-bottom: 12px;
+}
+
+/* Separate statistics */
+.assessment-stats-row {
+    padding-top: 10px;
+    border-top: 1px solid #eeeeee;
+    gap: 18px;
+}
+
+/* Mobile spacing */
+@media (max-width: 576px) {
+    .topic-body {
+        padding: 10px;
+        gap: 10px;
+    }
+
+    .assessment-item {
+        padding: 14px 12px;
+        border-radius: 8px;
+    }
+
+    .assessment-top-row {
+        margin-bottom: 10px;
+    }
+
+    .assessment-stats-row {
+        padding-top: 10px;
+        gap: 12px 8px;
+    }
+}

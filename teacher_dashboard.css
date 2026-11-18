@@ -1,0 +1,1165 @@
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    width: 100%;
+    min-height: 100%;
+    scroll-behavior: smooth;
+    overflow-x: clip;
+}
+
+body {
+    width: 100%;
+    min-width: 320px;
+    min-height: 100vh;
+    background: #f5f6f8;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #222;
+    overflow-x: clip;
+}
+
+button,
+input,
+select,
+textarea {
+    font-family: inherit;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+a {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* =========================================================
+   SIDEBAR
+========================================================= */
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    height: 100dvh;
+    background: #fff;
+    border-right: 1px solid #e0e0e0;
+    transition: width .3s ease, transform .3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.toggle-btn {
+    border: none;
+    background: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #444;
+    padding: 6px;
+    border-radius: 6px;
+}
+
+.sidebar-close-btn {
+    display: none;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+.toggle-btn:hover {
+    background: #f0f0f0;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 10px 0;
+    margin: 0;
+    flex: 1;
+}
+
+.sidebar ul li a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 24px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    font-size: 15px;
+    border-left: 3px solid transparent;
+    transition: background .2s, border-color .2s;
+    white-space: nowrap;
+}
+
+.sidebar ul li a:hover,
+.sidebar ul li a.active {
+    background: #f0f4f8;
+    border-left-color: #3f87b5;
+    color: #3f87b5;
+}
+
+.sidebar ul li a i {
+    min-width: 22px;
+    font-size: 17px;
+    text-align: center;
+}
+
+.sidebar.collapsed span {
+    display: none;
+}
+
+.sidebar.collapsed ul li a {
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.logout-btn {
+    border-top: 1px solid #e0e0e0;
+    padding: 10px 0;
+    flex-shrink: 0;
+}
+
+.logout-btn a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 24px;
+    text-decoration: none;
+    color: #dc3545;
+    font-weight: 600;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+.logout-btn a:hover {
+    background: #fff0f0;
+}
+
+.sidebar.collapsed .logout-btn span {
+    display: none;
+}
+
+.sidebar.collapsed .logout-btn a {
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+/* =========================================================
+   SIDEBAR OVERLAY
+========================================================= */
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .45);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity .3s ease;
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+/* =========================================================
+   MAIN CONTENT
+========================================================= */
+
+.main-content {
+    margin-left: 250px;
+    width: calc(100% - 250px);
+    min-height: 100vh;
+    min-width: 0;
+    transition: margin-left .3s ease, width .3s ease;
+}
+
+.main-content.expanded {
+    margin-left: 80px;
+    width: calc(100% - 80px);
+}
+
+/* =========================================================
+   TOPBAR
+========================================================= */
+
+.topbar {
+    height: 70px;
+    width: 100%;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 28px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 22px;
+    flex-shrink: 0;
+}
+
+.navbar-logo {
+    display: block;
+    height: 48px;
+    width: auto;
+    max-width: 220px;
+    object-fit: contain;
+}
+
+.navbar-right a {
+    color: #444;
+    text-decoration: none;
+    transition: color .2s;
+}
+
+.navbar-right a:hover {
+    color: #3f87b5;
+}
+
+.mobile-menu {
+    display: none;
+    border: none;
+    background: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #444;
+    padding: 6px;
+}
+
+/* =========================================================
+   PROFILE
+========================================================= */
+
+.profile-icon {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #d4dbe5;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.profile-icon i {
+    font-size: 18px;
+    color: #555;
+}
+
+.profile-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.search-section {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 25px 20px 10px;
+}
+
+.search-box {
+    width: 100%;
+    max-width: 700px;
+    min-width: 0;
+}
+
+.search-box form,
+.search-box .input-group {
+    width: 100%;
+    min-width: 0;
+}
+
+.search-box .form-control {
+    min-height: 44px;
+    min-width: 0;
+    font-size: 14px;
+    border-color: #dee2e6;
+}
+
+.search-box .form-control:focus {
+    border-color: #3f87b5;
+    box-shadow: 0 0 0 .15rem rgba(63, 135, 181, .15);
+}
+
+.search-box .btn {
+    min-width: 45px;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+.dashboard-container {
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 24px 28px !important;
+    min-width: 0;
+}
+
+.welcome-section {
+    margin-bottom: 22px;
+}
+
+.welcome-section h4 {
+    font-size: 23px;
+    overflow-wrap: anywhere;
+}
+
+.welcome-section p {
+    font-size: 14px;
+}
+
+/* =========================================================
+   STATISTICS
+========================================================= */
+
+.stats-container {
+    margin-bottom: 12px;
+}
+
+.stats-container > div {
+    min-width: 0;
+}
+
+.stat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    height: 100%;
+    min-height: 95px;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, .08) !important;
+}
+
+.stat-card .d-flex {
+    min-width: 0;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-card h4 {
+    font-size: 24px;
+}
+
+.stat-card small {
+    font-size: 13px;
+    display: block;
+}
+
+/* =========================================================
+   CLASS HEADING
+========================================================= */
+
+.classes-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-top: 25px;
+    margin-bottom: 16px;
+    min-width: 0;
+}
+
+.classes-heading > div {
+    min-width: 0;
+}
+
+.classes-heading h5 {
+    font-size: 19px;
+}
+
+.classes-heading small {
+    font-size: 13px;
+}
+
+.classes-heading .badge {
+    padding: 8px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   CLASS GRID
+========================================================= */
+
+.class-grid {
+    margin-top: 8px;
+}
+
+.class-grid > div {
+    min-width: 0;
+}
+
+/* =========================================================
+   CLASS CARDS
+========================================================= */
+
+.class-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+    background: #fff;
+    border-radius: 12px;
+    overflow: visible;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+    transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.class-card:hover {
+    box-shadow: 0 5px 16px rgba(0, 0, 0, .12);
+    transform: translateY(-2px);
+}
+
+.class-link {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    border-radius: 12px 12px 0 0;
+}
+
+.class-link:hover {
+    color: inherit;
+}
+
+.class-banner {
+    width: 100%;
+    height: 95px;
+}
+
+.class-content {
+    padding: 17px 20px;
+    min-width: 0;
+}
+
+.class-content h3 {
+    margin: 0 0 5px;
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.class-content p {
+    margin-top: 5px;
+    margin-bottom: 5px;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.class-content .teacher-name {
+    color: #5f6368;
+    margin-bottom: 10px;
+}
+
+.class-content .class-code {
+    margin-top: 12px;
+    overflow-wrap: anywhere;
+}
+
+/* =========================================================
+   CLASS OPTIONS
+========================================================= */
+
+.class-footer {
+    position: relative;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    border-top: 1px solid #eee;
+    padding: 9px 16px;
+    border-radius: 0 0 12px 12px;
+}
+
+.class-footer .btn-ellipsis {
+    width: 40px;
+    height: 38px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #555;
+    font-size: 16px;
+}
+
+.class-footer .btn-ellipsis:hover {
+    background: #f0f0f0;
+}
+
+.class-footer .dropdown-menu {
+    min-width: 180px;
+    border-radius: 10px;
+    z-index: 1100;
+}
+
+.class-footer .dropdown-item {
+    font-size: 14px;
+    padding: 10px 16px;
+}
+
+.class-footer .dropdown-item i {
+    width: 18px;
+    margin-right: 8px;
+}
+
+.class-footer .dropdown-item.text-danger:hover {
+    background: #f8d7da;
+}
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.empty-state {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.empty-state i {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   NOTIFICATIONS
+========================================================= */
+
+.notification-box {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.notification-item:last-child {
+    border: none;
+}
+
+.notification-item h6 {
+    font-size: 13px;
+}
+
+.avatar {
+    width: 45px;
+    height: 45px;
+    min-width: 45px;
+    border-radius: 50%;
+    background: #8ea9c7;
+    margin-right: 15px;
+}
+
+.dropdown-menu.notification-box {
+    width: 340px;
+    max-width: calc(100vw - 24px);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* =========================================================
+   DELETE MODAL
+========================================================= */
+
+.confirm-modal {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.confirm-modal .modal-body {
+    overflow-wrap: anywhere;
+}
+
+.confirm-modal .modal-footer {
+    gap: 8px;
+}
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+.toast-msg {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    max-width: calc(100vw - 48px);
+    background: #1a2d3e;
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .3s, transform .3s;
+    pointer-events: none;
+    overflow-wrap: anywhere;
+}
+
+.toast-msg.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-msg.error {
+    background: #dc3545;
+}
+
+/* =========================================================
+   LARGE DESKTOP
+========================================================= */
+
+@media (min-width: 1400px) {
+
+    .dashboard-container {
+        padding: 30px 38px !important;
+    }
+
+    .class-banner {
+        height: 110px;
+    }
+
+    .class-content {
+        padding: 20px 22px;
+    }
+
+}
+
+/* =========================================================
+   TABLETS AND SMALL LAPTOPS
+========================================================= */
+
+@media (max-width: 992px) {
+
+    .dashboard-container {
+        padding: 22px 20px !important;
+    }
+
+    .topbar {
+        padding: 0 20px;
+    }
+
+    .class-content {
+        padding: 15px;
+    }
+
+    .class-content h3 {
+        font-size: 19px;
+    }
+
+}
+
+/* =========================================================
+   MOBILE AND TABLET
+========================================================= */
+
+@media (max-width: 768px) {
+
+    /* Sidebar drawer */
+
+    .sidebar {
+        width: 270px;
+        max-width: 85vw;
+        transform: translateX(-100%);
+        box-shadow: 2px 0 16px rgba(0, 0, 0, .15);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar.collapsed {
+        width: 270px;
+    }
+
+    .sidebar.collapsed span,
+    .sidebar.collapsed .logout-btn span {
+        display: inline;
+    }
+
+    .sidebar.collapsed ul li a,
+    .sidebar.collapsed .logout-btn a {
+        justify-content: flex-start;
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+
+    .toggle-btn {
+        display: none;
+    }
+
+    .sidebar-close-btn {
+        display: block;
+        margin-left: auto;
+        border: none;
+        background: none;
+        font-size: 21px;
+        color: #444;
+        cursor: pointer;
+    }
+
+    .sidebar-header {
+        justify-content: flex-end;
+    }
+
+    /* Main content */
+
+    .main-content,
+    .main-content.expanded {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* Topbar */
+
+    .topbar {
+        height: 62px;
+        padding: 0 16px;
+    }
+
+    .mobile-menu {
+        display: block;
+    }
+
+    .navbar-left {
+        gap: 12px;
+    }
+
+    .navbar-right {
+        gap: 17px;
+    }
+
+    .navbar-logo {
+        height: 38px;
+        max-width: 180px;
+    }
+
+    /* Search */
+
+    .search-section {
+        padding: 17px 16px 5px;
+    }
+
+    /* Dashboard */
+
+    .dashboard-container {
+        padding: 20px 16px !important;
+    }
+
+    .welcome-section h4 {
+        font-size: 21px;
+    }
+
+    /* Statistics */
+
+    .stat-card {
+        padding: 16px;
+    }
+
+    /* Class cards */
+
+    .class-banner {
+        height: 85px;
+    }
+
+    .class-content {
+        padding: 15px 17px;
+    }
+
+    .class-content h3 {
+        font-size: 19px;
+    }
+
+    .classes-heading {
+        margin-top: 20px;
+    }
+
+    /* Notifications */
+
+    .dropdown-menu.notification-box {
+        width: 300px;
+    }
+
+}
+
+/* =========================================================
+   SMALL MOBILE PHONES
+========================================================= */
+
+@media (max-width: 576px) {
+
+    body {
+        font-size: 14px;
+    }
+
+    /* Topbar */
+
+    .topbar {
+        height: 58px;
+        padding: 0 12px;
+    }
+
+    .navbar-left {
+        gap: 8px;
+    }
+
+    .navbar-logo {
+        height: 32px;
+        max-width: 145px;
+    }
+
+    .navbar-right {
+        gap: 13px;
+    }
+
+    .navbar-right > a:first-child i,
+    .navbar-right .dropdown > a i {
+        font-size: 18px;
+    }
+
+    .profile-icon {
+        width: 35px;
+        height: 35px;
+        min-width: 35px;
+    }
+
+    .mobile-menu {
+        font-size: 20px;
+    }
+
+    /* Search */
+
+    .search-section {
+        padding: 14px 12px 4px;
+    }
+
+    .search-box .form-control {
+        font-size: 13px;
+        min-width: 0;
+    }
+
+    .search-box .btn {
+        min-width: 40px;
+        padding: 8px 12px;
+    }
+
+    /* Dashboard */
+
+    .dashboard-container {
+        padding: 17px 12px !important;
+    }
+
+    .welcome-section {
+        margin-bottom: 18px;
+    }
+
+    .welcome-section h4 {
+        font-size: 19px;
+    }
+
+    .welcome-section p {
+        font-size: 13px;
+    }
+
+    /* Statistics: one column */
+
+    .stats-container {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .stats-container > div {
+        width: 100%;
+        margin-bottom: 12px !important;
+    }
+
+    .stat-card {
+        min-height: 78px;
+        padding: 14px;
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        padding: 10px !important;
+    }
+
+    .stat-card h4 {
+        font-size: 21px;
+    }
+
+    .stat-card small {
+        font-size: 12px;
+    }
+
+    /* Assigned classes heading */
+
+    .classes-heading {
+        align-items: flex-start;
+        gap: 8px;
+        margin-top: 17px;
+    }
+
+    .classes-heading h5 {
+        font-size: 17px;
+    }
+
+    .classes-heading small {
+        font-size: 11px;
+        line-height: 1.5;
+        display: block;
+    }
+
+    .classes-heading .badge {
+        font-size: 10px;
+        padding: 7px 9px;
+    }
+
+    /* Class cards: one column */
+
+    .class-grid {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .class-grid > div {
+        width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        margin-bottom: 17px !important;
+    }
+
+    .class-banner {
+        height: 78px;
+    }
+
+    .class-content {
+        padding: 13px 15px;
+    }
+
+    .class-content h3 {
+        font-size: 18px;
+    }
+
+    .class-content p {
+        font-size: 12px;
+    }
+
+    .class-content .class-code {
+        font-size: 11px !important;
+    }
+
+    .class-footer {
+        padding: 7px 12px;
+    }
+
+    /* Empty state */
+
+    .empty-state {
+        padding: 15px;
+        font-size: 12px;
+    }
+
+    /* Notifications */
+
+    .dropdown-menu.notification-box {
+        width: min(290px, calc(100vw - 24px));
+    }
+
+    /* Modal */
+
+    .confirm-modal {
+        border-radius: 12px;
+    }
+
+    .confirm-modal .modal-title {
+        font-size: 17px;
+    }
+
+    .confirm-modal .modal-body {
+        font-size: 13px;
+    }
+
+    .confirm-modal .modal-footer .btn {
+        font-size: 13px;
+        padding: 7px 15px;
+    }
+
+    /* Toast */
+
+    .toast-msg {
+        left: 12px;
+        right: 12px;
+        bottom: 15px;
+        max-width: none;
+        text-align: center;
+        padding: 11px 15px;
+        font-size: 12px;
+    }
+
+}
+
+/* =========================================================
+   EXTRA SMALL PHONES
+========================================================= */
+
+@media (max-width: 380px) {
+
+    .topbar {
+        padding: 0 9px;
+    }
+
+    .navbar-logo {
+        height: 28px;
+        max-width: 120px;
+    }
+
+    .navbar-right {
+        gap: 9px;
+    }
+
+    .profile-icon {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+    }
+
+    .welcome-section h4 {
+        font-size: 17px;
+    }
+
+    .classes-heading h5 {
+        font-size: 15px;
+    }
+
+    .classes-heading .badge {
+        font-size: 9px;
+        padding: 6px 7px;
+    }
+
+    .class-content h3 {
+        font-size: 16px;
+    }
+
+    .search-box .form-control {
+        font-size: 12px;
+    }
+
+}
+
+/* =========================================================
+   ACCESSIBILITY AND TOUCH DEVICES
+========================================================= */
+
+@media (hover: none) {
+
+    .stat-card:hover,
+    .class-card:hover {
+        transform: none;
+    }
+
+    .sidebar ul li a,
+    .logout-btn a,
+    .class-footer .btn-ellipsis {
+        min-height: 44px;
+    }
+
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+    }
+
+}

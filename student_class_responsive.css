@@ -1,0 +1,563 @@
+
+/* =====================================================
+   STUDENT PEOPLE PAGE - RESPONSIVE DESIGN
+   Desktop | Tablet | Mobile
+===================================================== */
+
+/* GLOBAL */
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+}
+
+body {
+    background: #f8f9fa;
+}
+
+img {
+    max-width: 100%;
+}
+
+.container {
+    min-width: 0;
+}
+
+/* =====================================================
+   DESKTOP SIDEBAR
+===================================================== */
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1050;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transition: width 0.3s ease, transform 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.main-content {
+    min-height: 100vh;
+    min-width: 0;
+    margin-left: 250px;
+    width: calc(100% - 250px);
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.main-content.expanded {
+    margin-left: 80px;
+    width: calc(100% - 80px);
+}
+
+/* =====================================================
+   TOPBAR
+===================================================== */
+
+.topbar {
+    width: 100%;
+    min-height: 65px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 10px 25px;
+}
+
+.navbar-left,
+.navbar-right {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.navbar-left {
+    gap: 15px;
+}
+
+.navbar-logo {
+    display: block;
+    width: auto;
+    max-width: 190px;
+    max-height: 45px;
+    object-fit: contain;
+}
+
+.profile-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 50%;
+}
+
+.profile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.profile-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.mobile-menu {
+    display: none;
+    border: none;
+    background: transparent;
+    font-size: 23px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+/* =====================================================
+   CLASS NAVIGATION
+===================================================== */
+
+.class-nav {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.class-nav a {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* =====================================================
+   PEOPLE PAGE CONTAINER
+===================================================== */
+
+.main-content > .container {
+    width: 100%;
+    max-width: 1100px;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+.main-content h2 {
+    overflow-wrap: anywhere;
+    font-size: 28px;
+    font-weight: 600;
+}
+
+/* =====================================================
+   PEOPLE SECTIONS
+===================================================== */
+
+.people-section {
+    width: 100%;
+    min-width: 0;
+}
+
+.section-title {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* =====================================================
+   PEOPLE CARDS
+===================================================== */
+
+.people-card {
+    width: 100%;
+    min-width: 0;
+    min-height: 75px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.people-card:hover {
+    background: #fcfcfc;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+}
+
+.people-card > div:last-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.people-card h5 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.people-card small {
+    display: block;
+    font-size: 13px;
+}
+
+/* PROFILE AVATARS */
+
+.people-avatar {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.people-avatar-default {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e9ecef;
+    color: #6c757d;
+    font-size: 20px;
+}
+
+/* =====================================================
+   TABLET - 769px TO 1024px
+===================================================== */
+
+@media (max-width: 1024px) {
+
+    .main-content > .container {
+        max-width: 100%;
+        padding-left: 25px;
+        padding-right: 25px;
+    }
+
+    .topbar {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .people-card {
+        padding: 12px;
+    }
+
+}
+
+/* =====================================================
+   MOBILE - 768px AND BELOW
+===================================================== */
+
+@media (max-width: 768px) {
+
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
+    body.no-scroll {
+        overflow: hidden;
+    }
+
+    /* SIDEBAR DRAWER */
+
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px !important;
+        max-width: 85vw;
+        height: 100vh;
+        height: 100dvh;
+        z-index: 1100;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        overflow-y: auto;
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar.collapsed {
+        width: 260px !important;
+    }
+
+    /* Restore sidebar labels on mobile */
+
+    .sidebar span {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .sidebar.collapsed span {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .sidebar ul li a {
+        justify-content: flex-start;
+    }
+
+    .sidebar.collapsed ul li a {
+        justify-content: flex-start;
+    }
+
+    .sidebar.collapsed .sidebar-header {
+        justify-content: space-between;
+    }
+
+    /* OVERLAY */
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1090;
+    }
+
+    .sidebar-overlay.show {
+        display: block;
+    }
+
+    /* MAIN CONTENT */
+
+    .main-content,
+    .main-content.expanded {
+        width: 100% !important;
+        margin-left: 0 !important;
+        min-width: 0;
+    }
+
+    /* TOPBAR */
+
+    .topbar {
+        min-height: 60px;
+        padding: 9px 16px;
+        gap: 10px;
+    }
+
+    .navbar-left {
+        gap: 12px;
+    }
+
+    .mobile-menu {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .navbar-logo {
+        max-width: 155px;
+        max-height: 38px;
+    }
+
+    .profile-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    /* CLASS NAVIGATION */
+
+    .class-nav {
+        gap: 0;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .class-nav a {
+        padding: 12px 14px;
+        font-size: 14px;
+    }
+
+    /* PAGE CONTAINER */
+
+    .main-content > .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 22px 18px !important;
+    }
+
+    .main-content h2 {
+        font-size: 24px;
+        margin-bottom: 20px !important;
+    }
+
+    /* PEOPLE SECTIONS */
+
+    .section-title {
+        font-size: 18px;
+        margin-bottom: 12px;
+    }
+
+    .people-section.mt-5 {
+        margin-top: 30px !important;
+    }
+
+    /* PEOPLE CARDS */
+
+    .people-card {
+        min-height: 70px;
+        padding: 10px 12px;
+        gap: 12px;
+        border-radius: 9px;
+    }
+
+    .people-avatar {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+    }
+
+    .people-avatar-default {
+        font-size: 18px;
+    }
+
+    .people-card h5 {
+        font-size: 15px;
+    }
+
+    .people-card small {
+        font-size: 12px;
+    }
+
+}
+
+/* =====================================================
+   SMALL MOBILE - 576px AND BELOW
+===================================================== */
+
+@media (max-width: 576px) {
+
+    .topbar {
+        min-height: 56px;
+        padding: 8px 12px;
+    }
+
+    .navbar-logo {
+        max-width: 135px;
+        max-height: 34px;
+    }
+
+    .mobile-menu {
+        font-size: 21px;
+    }
+
+    .profile-icon {
+        width: 35px;
+        height: 35px;
+    }
+
+    /* CLASS NAV */
+
+    .class-nav a {
+        padding: 11px 12px;
+        font-size: 13px;
+    }
+
+    /* PAGE */
+
+    .main-content > .container {
+        padding: 18px 14px !important;
+    }
+
+    .main-content h2 {
+        font-size: 22px;
+        margin-bottom: 18px !important;
+    }
+
+    /* SECTION HEADINGS */
+
+    .section-title {
+        font-size: 17px;
+        padding-bottom: 10px;
+    }
+
+    /* PEOPLE CARDS */
+
+    .people-card {
+        min-height: 65px;
+        padding: 9px 10px;
+        gap: 10px;
+    }
+
+    .people-avatar {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+    }
+
+    .people-card h5 {
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .people-card small {
+        font-size: 12px;
+    }
+
+}
+
+/* =====================================================
+   EXTRA SMALL MOBILE - 400px AND BELOW
+===================================================== */
+
+@media (max-width: 400px) {
+
+    .navbar-logo {
+        max-width: 115px;
+    }
+
+    .main-content > .container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .people-card {
+        gap: 9px;
+        padding: 9px;
+    }
+
+    .people-avatar {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+    }
+
+    .people-card h5 {
+        font-size: 13px;
+    }
+
+}

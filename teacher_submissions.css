@@ -1,0 +1,458 @@
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #555;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 18px;
+}
+.back-link:hover { color: #3f87b5; }
+
+.submissions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.submissions-header h2 {
+    font-weight: 800;
+    font-size: 22px;
+    color: #1a2d3e;
+    word-break: break-word;
+}
+
+.submissions-sub {
+    color: #888;
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.submissions-summary {
+    display: flex;
+    gap: 12px;
+}
+
+.summary-pill {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 10px;
+    padding: 10px 18px;
+    text-align: center;
+}
+
+.summary-pill strong {
+    display: block;
+    font-size: 18px;
+    color: #1a2d3e;
+}
+
+.summary-pill span {
+    font-size: 12px;
+    color: #888;
+}
+
+.submissions-list {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.submission-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.submission-row:last-child { border-bottom: none; }
+
+.submission-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #d4dbe5;
+}
+
+.submission-avatar-def {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+}
+
+.submission-main { flex: 1; min-width: 0; }
+
+.submission-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: #222;
+}
+
+.submission-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #888;
+}
+
+.status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.badge-missing   { background: #fdeaea; color: #c0392b; }
+.badge-submitted { background: #e8f3fb; color: #3f87b5; }
+.badge-done      { background: #e9f9ee; color: #2f9e64; }
+
+.grade-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.grade-input {
+    width: 60px;
+    height: 38px;
+    text-align: center;
+    border: 1px solid #dde4ec;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.grade-input:focus {
+    border-color: #3f87b5;
+    outline: none;
+}
+
+.grade-total {
+    font-size: 13px;
+    color: #888;
+}
+/* ============================================================
+   SUBMISSIONS TABS (Instructions / Student work)
+   ============================================================ */
+.submissions-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 22px;
+}
+
+.submissions-tab {
+    border: none;
+    background: none;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: background 0.2s, color 0.2s;
+}
+
+.submissions-tab:hover {
+    background: #f5f6f8;
+}
+
+.submissions-tab.active {
+    background: #e8e8e8;
+    color: #1a2d3e;
+    font-weight: 600;
+}
+
+/* ============================================================
+   INSTRUCTIONS PANEL
+   ============================================================ */
+.instructions-card {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+    padding: 24px 28px;
+}
+
+.instructions-title {
+    font-weight: 800;
+    font-size: 20px;
+    color: #1a2d3e;
+    margin-bottom: 4px;
+    word-break: break-word;
+}
+
+.instructions-desc {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #333;
+    margin: 16px 0;
+    white-space: pre-wrap;
+}
+
+.instructions-empty {
+    color: #aaa;
+    font-style: italic;
+}
+
+.instructions-image {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    margin-bottom: 14px;
+}
+
+.instructions-link,
+.instructions-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #3f87b5;
+    text-decoration: none;
+    background: #f0f6fb;
+    border: 1px solid #cde0ef;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-right: 10px;
+    margin-bottom: 8px;
+    word-break: break-all;
+    transition: background 0.2s;
+    max-width: 100%;
+}
+
+.instructions-link:hover,
+.instructions-file:hover {
+    background: #daeaf5;
+    color: #2f76a7;
+}
+
+/* ============================================================
+   SUBMISSIONS TABLE (Student work panel)
+   ============================================================ */
+.submissions-table-wrap {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.submissions-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.submissions-table thead th {
+    text-align: left;
+    background: #e8e8e8;
+    color: #222;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 14px 20px;
+}
+
+.submissions-table tbody td {
+    padding: 14px 20px;
+    border-top: 1px solid #f0f0f0;
+    font-size: 14px;
+    color: #333;
+    vertical-align: middle;
+}
+
+.submissions-table tbody tr:hover {
+    background: #fafbfc;
+}
+
+.student-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    color: #222;
+}
+
+.cell-muted {
+    color: #bbb;
+}
+
+.submission-file-link {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    color: #3f87b5;
+    text-decoration: none;
+}
+
+.submission-file-link:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================
+   CLICKABLE NAME → VIEW SUBMISSION MODAL
+   ============================================================ */
+.student-name-clickable {
+    cursor: pointer;
+    border-radius: 8px;
+    padding: 4px 6px;
+    margin: -4px -6px;
+    transition: background 0.15s;
+}
+.student-name-clickable:hover { background: #f0f6fb; }
+.student-name-clickable:hover span:first-of-type,
+.student-name-clickable:hover > span {
+    color: #3f87b5;
+}
+.student-name-clickable:focus-visible {
+    outline: 2px solid #3f87b5;
+    outline-offset: 2px;
+}
+
+.attachment-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #3f87b5;
+    background: #eaf3fa;
+    border-radius: 20px;
+    padding: 2px 9px;
+    flex-shrink: 0;
+}
+
+/* ── Submission viewer modal ── */
+.submission-modal-content {
+    border-radius: 14px;
+    border: none;
+}
+
+.submission-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.submission-modal-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.submission-modal-attachments {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.submission-modal-file {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: #3f87b5;
+    background: #f0f6fb;
+    border: 1px solid #cde0ef;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-decoration: none;
+    word-break: break-all;
+    transition: background 0.2s;
+}
+.submission-modal-file:hover { background: #daeaf5; color: #2f76a7; }
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+@media (max-width: 768px) {
+
+    .submissions-header {
+        gap: 12px;
+    }
+
+    .submissions-header h2 {
+        font-size: 19px;
+    }
+
+    .summary-pill {
+        padding: 8px 14px;
+    }
+
+    .instructions-card {
+        padding: 18px;
+    }
+
+    /* ── Keep it a real table, just let it scroll sideways ──
+       .submissions-table-wrap already has overflow-x:auto; giving
+       the table itself a min-width stops columns from being
+       crushed unreadably and turns the overflow into a
+       horizontal swipe instead. */
+    .submissions-table {
+        min-width: 620px;
+    }
+
+    .submissions-table thead th,
+    .submissions-table tbody td {
+        padding: 12px 14px;
+        font-size: 13px;
+    }
+
+    .grade-form {
+        flex-wrap: nowrap;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .submissions-summary {
+        width: 100%;
+    }
+
+    .summary-pill {
+        flex: 1;
+    }
+
+    .submissions-tab {
+        padding: 9px 14px;
+        font-size: 14px;
+    }
+
+    .instructions-card {
+        padding: 16px;
+    }
+
+    .submissions-table {
+        min-width: 560px;
+    }
+
+    .grade-input {
+        width: 52px;
+    }
+
+    .btn-mini {
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+}

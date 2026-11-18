@@ -1,0 +1,509 @@
+/* ============================================================
+   SUBMISSION VIEW PAGE
+   ============================================================ */
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #555;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.back-link:hover {
+    color: #3f87b5;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.submission-page-header {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 14px;
+    padding: 22px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+.student-information {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.student-information h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #1a2d3e;
+}
+
+.student-information p {
+    margin: 5px 0 0;
+    color: #888;
+    font-size: 14px;
+}
+
+.student-large-avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #d4dbe5;
+    flex-shrink: 0;
+}
+
+.avatar-default {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 22px;
+}
+
+
+/* ============================================================
+   STATUS
+   ============================================================ */
+
+.status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.badge-missing {
+    background: #fdeaea;
+    color: #c0392b;
+}
+
+.badge-submitted {
+    background: #e8f3fb;
+    color: #3f87b5;
+}
+
+.badge-done {
+    background: #e9f9ee;
+    color: #2f9e64;
+}
+
+
+/* ============================================================
+   ASSESSMENT INFORMATION
+   ============================================================ */
+
+.assessment-info-card {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+    padding: 18px 22px;
+
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+
+    gap: 20px;
+
+    margin-bottom: 18px;
+}
+
+.assessment-info-card > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.info-label {
+    font-size: 12px;
+    color: #999;
+    font-weight: 600;
+}
+
+.assessment-info-card strong {
+    color: #1a2d3e;
+    font-size: 14px;
+    word-break: break-word;
+}
+
+
+/* ============================================================
+   SUBMISSION CARD
+   ============================================================ */
+
+.submission-card {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 18px;
+}
+
+.submission-card-header {
+    padding: 22px 24px;
+    border-bottom: 1px solid #edf0f3;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.submission-card-header h2 {
+    margin: 0;
+    color: #1a2d3e;
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.submission-card-header p {
+    margin: 5px 0 0;
+    color: #888;
+    font-size: 13px;
+}
+
+.current-grade {
+    text-align: right;
+}
+
+.current-grade span {
+    display: block;
+    font-size: 12px;
+    color: #888;
+}
+
+.current-grade strong {
+    display: block;
+    font-size: 20px;
+    color: #1a2d3e;
+}
+
+
+/* ============================================================
+   ATTACHMENTS
+   ============================================================ */
+
+.submission-attachments {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.submission-attachment {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    padding: 14px 16px;
+
+    border: 1px solid #dfe7ef;
+    border-radius: 10px;
+
+    background: #f8fbfd;
+
+    text-decoration: none;
+
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        transform 0.15s;
+}
+
+.submission-attachment:hover {
+    background: #f0f6fb;
+    border-color: #c8dce9;
+    transform: translateY(-1px);
+}
+
+.attachment-icon {
+    width: 42px;
+    height: 42px;
+
+    border-radius: 9px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #e8f3fb;
+    color: #3f87b5;
+
+    flex-shrink: 0;
+}
+
+.link-icon {
+    background: #eef4fa;
+}
+
+.attachment-information {
+    flex: 1;
+    min-width: 0;
+}
+
+.attachment-information strong {
+    display: block;
+
+    color: #253746;
+
+    font-size: 14px;
+
+    word-break: break-word;
+}
+
+.attachment-information span {
+    display: block;
+
+    color: #999;
+
+    font-size: 12px;
+
+    margin-top: 3px;
+}
+
+.attachment-open {
+    color: #888;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+
+/* ============================================================
+   NO SUBMISSION
+   ============================================================ */
+
+.no-submission {
+    text-align: center;
+    padding: 45px 20px;
+    color: #999;
+}
+
+.no-submission i {
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.no-submission h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+}
+
+.no-submission p {
+    margin: 5px 0 0;
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   GRADING
+   ============================================================ */
+
+.grading-card {
+    background: #fff;
+    border: 1px solid #e0e8f0;
+    border-radius: 14px;
+    padding: 20px 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+.grading-card h2 {
+    margin: 0;
+    color: #1a2d3e;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.grading-card p {
+    margin: 4px 0 0;
+    color: #888;
+    font-size: 13px;
+}
+
+.grading-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.grade-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #888;
+    font-size: 14px;
+}
+
+.grade-input-large {
+    width: 75px;
+    height: 42px;
+
+    border: 1px solid #d8e0e8;
+    border-radius: 7px;
+
+    text-align: center;
+
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.grade-input-large:focus {
+    outline: none;
+    border-color: #3f87b5;
+}
+
+.save-grade-btn {
+    height: 42px;
+
+    border: none;
+    border-radius: 7px;
+
+    padding: 0 17px;
+
+    background: #3f87b5;
+    color: #fff;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.save-grade-btn:hover {
+    background: #32749d;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    .submission-page-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .assessment-info-card {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .submission-card-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .current-grade {
+        text-align: left;
+    }
+
+    .grading-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .grading-form {
+        width: 100%;
+    }
+
+    .grade-input-wrapper {
+        flex: 1;
+    }
+
+    .grade-input-large {
+        width: 100%;
+    }
+
+    .save-grade-btn {
+        white-space: nowrap;
+    }
+
+}
+
+
+@media (max-width: 480px) {
+
+    .assessment-info-card {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .student-information h1 {
+        font-size: 19px;
+    }
+
+    .student-information {
+        gap: 12px;
+    }
+
+    .student-large-avatar {
+        width: 50px;
+        height: 50px;
+    }
+
+    .grading-form {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .grade-input-wrapper {
+        width: 100%;
+    }
+
+    .save-grade-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Tighten card padding so more content fits on narrow screens */
+    .submission-page-header,
+    .assessment-info-card,
+    .submission-card-header,
+    .submission-attachments,
+    .grading-card {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .submission-card-header h2 {
+        font-size: 17px;
+    }
+
+    .grading-card h2 {
+        font-size: 16px;
+    }
+
+    .submission-attachment {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .attachment-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 14px;
+    }
+
+    .attachment-open {
+        font-size: 12px;
+    }
+
+}

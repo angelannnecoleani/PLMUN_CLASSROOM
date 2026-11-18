@@ -1,0 +1,567 @@
+/* =========================================
+   CLASS PERFORMANCE PAGE
+   Load AFTER teacher_class.css.
+   Scoped to .class-perf-page so other pages are unaffected.
+========================================= */
+
+.class-perf-page {
+    --brand: #3f87b5;
+    --ink: #1a2d3e;
+    --line: #e0e8f0;
+    --muted: #7a8794;
+}
+
+.class-perf-page .container {
+    max-width: 1200px;
+}
+
+
+/* =========================================
+   SIDEBAR + LAYOUT
+========================================= */
+
+.class-perf-page .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 1000;
+    overflow-y: auto;
+    transition: width 0.3s ease, left 0.3s ease;
+}
+
+.class-perf-page .sidebar.collapsed { width: 80px; }
+
+.class-perf-page .sidebar ul li a.active {
+    color: var(--brand);
+    border-left-color: var(--brand);
+    background: #f0f6fb;
+}
+
+.class-perf-page .main-content {
+    margin-left: 250px;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+.class-perf-page .main-content.expanded { margin-left: 80px; }
+
+.class-perf-page .sidebar-close-btn { display: none; }
+
+.class-perf-page .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+}
+
+.class-perf-page .sidebar-overlay.show { display: block; opacity: 1; }
+
+.class-perf-page .mobile-menu {
+    display: none;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-size: 22px;
+    cursor: pointer;
+}
+
+body.no-scroll { overflow: hidden; }
+
+
+/* =========================================
+   PAGE HEADER
+========================================= */
+
+.class-perf-page .perf-page-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.class-perf-page .back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border: 1px solid #dde4ec;
+    border-radius: 50%;
+    background: #fff;
+    color: #555;
+    font-size: 15px;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.class-perf-page .back-btn:hover { background: #f0f4f8; color: var(--brand); }
+
+.class-perf-page .perf-heading { flex: 1; min-width: 0; }
+
+.class-perf-page .perf-page-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.25;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.class-perf-page .perf-page-sub {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: #888;
+}
+
+.class-perf-page .perf-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.class-perf-page .refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1px solid #dde4ec;
+    border-radius: 8px;
+    background: #fff;
+    color: #555;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.class-perf-page .refresh-btn:hover { background: #f0f4f8; color: var(--brand); }
+.class-perf-page .refresh-btn.spinning i { animation: perfSpin 0.6s linear infinite; }
+
+@keyframes perfSpin { to { transform: rotate(360deg); } }
+
+.class-perf-page .live-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: #d4edda;
+    color: #28a745;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.class-perf-page .live-dot::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #28a745;
+    animation: perfPulse 1.4s infinite;
+}
+
+@keyframes perfPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(1.3); }
+}
+
+
+/* =========================================
+   SUMMARY CARDS
+========================================= */
+
+.class-perf-page .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.class-perf-page .summary-card {
+    padding: 16px 10px;
+    border: 1px solid var(--line);
+    border-top: 4px solid transparent;
+    border-radius: 12px;
+    background: #fff;
+    text-align: center;
+}
+
+.class-perf-page .summary-card.excellent  { border-top-color: #28a745; }
+.class-perf-page .summary-card.good       { border-top-color: #3f87b5; }
+.class-perf-page .summary-card.average    { border-top-color: #f0a500; }
+.class-perf-page .summary-card.needs-help { border-top-color: #dc3545; }
+.class-perf-page .summary-card.ungraded   { border-top-color: #adb5bd; }
+
+.class-perf-page .summary-num {
+    margin-bottom: 4px;
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.class-perf-page .summary-num.green  { color: #28a745; }
+.class-perf-page .summary-num.blue   { color: #3f87b5; }
+.class-perf-page .summary-num.yellow { color: #f0a500; }
+.class-perf-page .summary-num.red    { color: #dc3545; }
+.class-perf-page .summary-num.grey   { color: #adb5bd; }
+
+.class-perf-page .summary-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #888;
+}
+
+.class-perf-page .summary-range {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    color: #aaa;
+}
+
+
+/* =========================================
+   CHART CARDS
+========================================= */
+
+.class-perf-page .chart-card {
+    min-width: 0;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+}
+
+.class-perf-page .row > [class*="col"] > .chart-card { margin-bottom: 0; }
+
+.class-perf-page .chart-card-title {
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.class-perf-page .chart-card-sub {
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #888;
+}
+
+/* Fixed-height box so Chart.js can resize freely */
+.class-perf-page .chart-box {
+    position: relative;
+    width: 100%;
+    height: 340px;
+}
+
+.class-perf-page .chart-box.chart-box-sm { height: 300px; }
+.class-perf-page .chart-box.chart-box-bar { height: 280px; }
+
+
+/* =========================================
+   STUDENT RANKINGS
+========================================= */
+
+.class-perf-page .rank-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.class-perf-page .rank-header .chart-card-sub { margin-bottom: 0; }
+
+/* Grid keeps the same markup that performance_data.php returns */
+.class-perf-page .student-perf-row {
+    display: grid;
+    grid-template-columns: 38px minmax(150px, 220px) minmax(0, 1fr) 56px auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.class-perf-page .student-perf-row:last-child { border-bottom: none; }
+
+.class-perf-page .s-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: #d4dbe5;
+    color: #666;
+    font-size: 14px;
+}
+
+.class-perf-page .s-avatar img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.class-perf-page .s-info { min-width: 0; }
+
+.class-perf-page .s-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.class-perf-page .s-sub {
+    margin-top: 1px;
+    font-size: 11px;
+    color: #aaa;
+}
+
+.class-perf-page .bar-wrap {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 20px;
+    background: #eef2f7;
+}
+
+.class-perf-page .bar-fill {
+    height: 100%;
+    border-radius: 20px;
+    transition: width 1s ease;
+}
+
+.class-perf-page .bar-fill.high { background: linear-gradient(90deg, #28a745, #5cb85c); }
+.class-perf-page .bar-fill.mid  { background: linear-gradient(90deg, #f0a500, #ffc107); }
+.class-perf-page .bar-fill.low  { background: linear-gradient(90deg, #dc3545, #e87a7a); }
+
+.class-perf-page .score-pct {
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+    text-align: right;
+}
+
+.class-perf-page .status-badge {
+    justify-self: end;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.class-perf-page .status-badge.excellent  { background: #d4edda; color: #155724; }
+.class-perf-page .status-badge.good       { background: #cce5ff; color: #004085; }
+.class-perf-page .status-badge.average    { background: #fff3cd; color: #856404; }
+.class-perf-page .status-badge.needs-help { background: #f8d7da; color: #721c24; }
+.class-perf-page .status-badge.ungraded   { background: #f0f0f0; color: #888; }
+
+
+/* =========================================
+   EMPTY STATE
+========================================= */
+
+.class-perf-page .perf-empty {
+    padding: 50px 20px;
+    text-align: center;
+    font-size: 14px;
+    color: #9aa7b3;
+}
+
+.class-perf-page .perf-empty i {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 44px;
+    color: #c4ced8;
+}
+
+
+/* =========================================
+   LAPTOP / SMALL DESKTOP (<= 1100px)
+========================================= */
+
+@media (max-width: 1100px) {
+    .class-perf-page .student-perf-row {
+        grid-template-columns: 38px minmax(130px, 180px) minmax(0, 1fr) 52px auto;
+    }
+}
+
+
+/* =========================================
+   TABLET AND MOBILE (<= 768px)
+========================================= */
+
+@media (max-width: 768px) {
+
+    /* Sidebar slides in */
+    .class-perf-page .sidebar {
+        left: -250px;
+        width: 250px;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+        transition: left 0.3s ease;
+    }
+
+    .class-perf-page .sidebar.show { left: 0; }
+    .class-perf-page .sidebar.collapsed { width: 250px; }
+    .class-perf-page .sidebar.collapsed span { display: inline; }
+    .class-perf-page .toggle-btn { display: none; }
+
+    .class-perf-page .sidebar-header {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .class-perf-page .sidebar-close-btn {
+        display: block;
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-size: 21px;
+        padding: 8px 12px;
+        cursor: pointer;
+    }
+
+    .class-perf-page .main-content,
+    .class-perf-page .main-content.expanded {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .class-perf-page .mobile-menu {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+    }
+
+    .class-perf-page .topbar { height: 60px; padding: 0 12px; }
+    .class-perf-page .navbar-left { gap: 8px; }
+    .class-perf-page .navbar-logo { height: 34px; }
+    .class-perf-page .profile-icon { width: 36px; height: 36px; }
+
+    .class-perf-page .container.py-4 { padding: 18px 14px 32px !important; }
+
+    /* Header: title row, then full-width actions */
+    .class-perf-page .perf-page-header {
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+
+    .class-perf-page .perf-page-title { font-size: 19px; }
+
+    .class-perf-page .perf-actions {
+        width: 100%;
+        order: 3;
+    }
+
+    .class-perf-page .perf-actions .refresh-btn { flex: 1; }
+
+    /* Summary: 3 columns */
+    .class-perf-page .summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .class-perf-page .summary-num { font-size: 26px; }
+
+    /* Charts */
+    .class-perf-page .chart-card { padding: 16px; margin-bottom: 16px; }
+    .class-perf-page .chart-box { height: 300px; }
+    .class-perf-page .chart-box.chart-box-sm { height: 280px; }
+    .class-perf-page .chart-box.chart-box-bar { height: 260px; }
+
+    /* Student rows: avatar | name | badge, then bar | percent */
+    .class-perf-page .student-perf-row {
+        grid-template-columns: 38px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "avatar info badge"
+            "bar    bar  pct";
+        row-gap: 10px;
+        column-gap: 12px;
+    }
+
+    .class-perf-page .s-avatar     { grid-area: avatar; }
+    .class-perf-page .s-info       { grid-area: info; }
+    .class-perf-page .status-badge { grid-area: badge; }
+    .class-perf-page .bar-wrap     { grid-area: bar; }
+    .class-perf-page .score-pct    { grid-area: pct; min-width: 48px; }
+}
+
+
+/* =========================================
+   SMALL PHONES (<= 480px)
+========================================= */
+
+@media (max-width: 480px) {
+
+    .class-perf-page .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Fifth card fills the last row */
+    .class-perf-page .summary-card.ungraded { grid-column: 1 / -1; }
+
+    .class-perf-page .summary-card { padding: 14px 8px; }
+    .class-perf-page .summary-num { font-size: 24px; }
+
+    .class-perf-page .chart-card { padding: 14px 12px; }
+    .class-perf-page .chart-box { height: 280px; }
+    .class-perf-page .chart-box.chart-box-sm { height: 260px; }
+    .class-perf-page .chart-box.chart-box-bar { height: 240px; }
+
+    .class-perf-page .status-badge { padding: 3px 9px; font-size: 10.5px; }
+    .class-perf-page .refresh-btn { padding: 8px 10px; font-size: 12.5px; }
+}
+
+
+/* =========================================
+   VERY SMALL PHONES (<= 360px)
+========================================= */
+
+@media (max-width: 360px) {
+    .class-perf-page .navbar-logo { height: 28px; }
+    .class-perf-page .perf-page-title { font-size: 17px; }
+    .class-perf-page .s-avatar { display: none; }
+
+    .class-perf-page .student-perf-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "info badge"
+            "bar  pct";
+    }
+}
+
+
+/* =========================================
+   REDUCED MOTION
+========================================= */
+
+@media (prefers-reduced-motion: reduce) {
+    .class-perf-page .sidebar,
+    .class-perf-page .main-content,
+    .class-perf-page .bar-fill { transition: none; }
+
+    .class-perf-page .live-dot::before,
+    .class-perf-page .refresh-btn.spinning i { animation: none; }
+}

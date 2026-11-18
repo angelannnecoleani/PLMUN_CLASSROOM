@@ -1,0 +1,155 @@
+/* class_chat_actions.css — edit / delete UI for chat messages */
+
+/* time line now holds: time · edited · ⋮ */
+.msg-time { display: flex; align-items: center; gap: 4px; }
+.msg-row.me .msg-time { justify-content: flex-end; }
+
+.msg-edited-tag { font-style: italic; }
+
+.msg-menu-btn {
+    border: none;
+    background: none;
+    color: #aaa;
+    width: 26px;
+    height: 26px;
+    margin: -6px 0;           /* don't make the time line taller */
+    padding: 0;
+    border-radius: 50%;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.msg-menu-btn:hover { background: #e8eef4; color: #3f87b5; }
+
+/* On mouse devices only show the button while hovering the message */
+@media (hover: hover) {
+    .msg-row.me .msg-menu-btn { opacity: 0; }
+    .msg-row.me:hover .msg-menu-btn,
+    .msg-row.me .msg-menu-btn:focus-visible { opacity: 1; }
+}
+
+/* Popup menu (one shared element, positioned by JS) */
+.msg-menu {
+    position: fixed;
+    z-index: 2000;
+    min-width: 140px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .15);
+    padding: 4px;
+    display: none;
+}
+.msg-menu.show { display: block; }
+.msg-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    border: none;
+    background: none;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: #333;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+}
+.msg-menu button i { width: 16px; text-align: center; font-size: 13px; }
+.msg-menu button:hover { background: #f0f4f8; }
+.msg-menu button.danger { color: #dc3545; }
+.msg-menu button.danger:hover { background: #fff0f0; }
+
+/* Inline editor that replaces the bubble */
+.msg-edit-box {
+    background: #fff;
+    border: 1px solid #3f87b5;
+    border-radius: 14px;
+    padding: 8px 10px;
+    width: min(320px, 62vw);
+    min-width: 200px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+.msg-edit-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: #222;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.4;
+    max-height: 140px;
+}
+.msg-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+.msg-edit-actions button {
+    border: none;
+    border-radius: 16px;
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.msg-edit-cancel { background: #eef1f4; color: #555; }
+.msg-edit-cancel:hover { background: #e2e7ec; }
+.msg-edit-save { background: #3f87b5; color: #fff; }
+.msg-edit-save:hover { background: #2f76a7; }
+.msg-edit-save:disabled { opacity: .6; cursor: default; }
+
+@media (max-width: 768px) {
+    /* 16px stops iOS from zooming in on focus */
+    .msg-edit-input { font-size: 16px; }
+    .msg-edit-box { width: min(320px, 70vw); }
+}
+
+/* "Edited" label */
+.msg-edited-tag { color: #8a97a3; }
+.msg-edited-tag i { font-size: 8px; margin-right: 1px; }
+
+/* "This message was deleted" placeholder */
+.msg-row .msg-bubble.msg-deleted,
+.msg-row.me .msg-bubble.msg-deleted {
+    background: transparent;
+    color: #8a97a3;
+    font-style: italic;
+    border: 1px dashed #cfd6dd;
+    box-shadow: none;
+}
+.msg-bubble.msg-deleted i { font-size: 12px; margin-right: 4px; }
+
+/* ============================================================
+   FLOATING GROUP CHAT WIDGET (student_class.php / teacher_class.php)
+   ============================================================ */
+.gchat-time { display: flex; align-items: center; gap: 4px; }
+.gchat-row.me .gchat-time { justify-content: flex-end; }
+
+@media (hover: hover) {
+    .gchat-row.me .msg-menu-btn { opacity: 0; }
+    .gchat-row.me:hover .msg-menu-btn,
+    .gchat-row.me .msg-menu-btn:focus-visible { opacity: 1; }
+}
+
+.gchat-col .msg-edit-box { width: 230px; max-width: 100%; min-width: 0; padding: 6px 8px; }
+.gchat-col .msg-edit-input { font-size: 13.5px; }
+
+.gchat-row .gchat-bubble.msg-deleted,
+.gchat-row.me .gchat-bubble.msg-deleted {
+    background: transparent;
+    color: #8a97a3;
+    font-style: italic;
+    border: 1px dashed #cfd6dd;
+    box-shadow: none;
+}
+.gchat-bubble.msg-deleted i { font-size: 11px; margin-right: 4px; }
+
+@media (max-width: 480px) {
+    .gchat-col .msg-edit-input { font-size: 16px; }
+}

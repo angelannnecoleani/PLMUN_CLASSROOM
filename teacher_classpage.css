@@ -1,0 +1,461 @@
+/* RESET & BASE */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #f5f6f8;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    overflow-x: hidden;
+    color: #222;
+}
+
+/* SIDEBAR */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100vh;
+    background: #fff;
+    border-right: 1px solid #e0e0e0;
+    transition: width 0.3s ease, transform 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 18px 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.toggle-btn {
+    border: none;
+    background: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #444;
+    padding: 4px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.toggle-btn:hover {
+    background: #f0f0f0;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 10px 0;
+    margin: 0;
+    flex: 1;
+}
+
+.sidebar ul li a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 24px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    font-size: 15px;
+    border-left: 3px solid transparent;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.sidebar ul li a:hover {
+    background: #f0f4f8;
+    border-left-color: #3f87b5;
+    color: #3f87b5;
+}
+
+.sidebar ul li a i {
+    min-width: 22px;
+    font-size: 17px;
+    text-align: center;
+}
+
+.sidebar.collapsed span {
+    display: none;
+}
+
+.logout-btn {
+    border-top: 1px solid #e0e0e0;
+    padding: 10px 0;
+}
+
+.logout-btn a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 24px;
+    text-decoration: none;
+    color: #dc3545;
+    font-weight: 600;
+    font-size: 15px;
+    transition: background 0.2s;
+}
+
+.logout-btn a:hover {
+    background: #fff0f0;
+}
+
+.sidebar.collapsed .logout-btn span {
+    display: none;
+}
+
+/* SIDEBAR OVERLAY (mobile only, dims page behind open sidebar) */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+.main-content {
+    margin-left: 250px;
+    transition: margin-left 0.3s ease;
+    min-height: 100vh;
+}
+
+.main-content.expanded {
+    margin-left: 80px;
+}
+
+/* ============================================================
+   TOPBAR
+   ============================================================ */
+.topbar {
+    height: 70px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 28px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.navbar-logo {
+    height: 48px;
+    width: auto;
+}
+
+.profile-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #d4dbe5;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.profile-icon i {
+    font-size: 18px;
+    color: #555;
+}
+
+.profile-icon img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    border-radius:50%;
+}
+
+
+.navbar-right a {
+    color: #444;
+    transition: color 0.2s;
+}
+
+.navbar-right a:hover {
+    color: #3f87b5;
+}
+
+.mobile-menu {
+    display: none;
+    border: none;
+    background: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #444;
+}
+
+.search-section{
+    display:flex;
+    justify-content:center;
+    padding:25px 20px 10px;
+}
+
+
+.search-box{
+    width:100%;
+    max-width:700px;
+}
+
+/* ================= NOTIFICATION ================= */
+
+
+.notification-box{
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+
+.notification-item{
+    display:flex;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid #eee;
+}
+
+
+.notification-item:last-child{
+    border:none;
+}
+
+
+.avatar{
+    width:45px;
+    height:45px;
+    border-radius:50%;
+    background:#8ea9c7;
+    margin-right:15px;
+}
+.notif-badge{
+    position:absolute;
+    top:-6px;
+    right:-8px;
+    background:#dc3545;
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    border-radius:50%;
+    width:18px;
+    height:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.dropdown-menu.notification-box{
+    width:340px;
+    max-height:400px;
+    overflow-y:auto;
+}
+
+/* ================= CLASS CARD ================= */
+
+.class-link{
+    text-decoration:none;
+    color:inherit;
+}
+
+.class-link:hover{
+    color:inherit;
+}
+
+
+.class-card{
+    background:#fff;
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+    height:100%;
+}
+
+
+.class-card:hover{
+    box-shadow:0 4px 15px rgba(0,0,0,.1);
+}
+
+
+.class-banner{
+    height:90px;
+    background:#d9d9d9;
+   
+}
+
+
+.class-content{
+    padding:15px 20px;
+}
+
+.class-content h3{
+    margin:0;
+    font-size:22px;
+    font-weight:600;
+
+
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+
+.class-content p{
+    margin-top:4px;
+    font-size:14px;
+}
+
+
+.teacher-name{
+    font-size:14px;
+    color:#5f6368;
+    margin-bottom:8px;
+}
+
+
+.class-footer{
+    border-top:1px solid #eee;
+    padding:12px 20px;
+
+    display:flex;
+    justify-content:flex-end;
+}
+
+/* ============================================================
+   RESPONSIVE / MOBILE
+   ============================================================ */
+
+/* Tablets and small laptops */
+@media (max-width: 992px) {
+    .container-fluid.p-4 {
+        padding: 24px !important;
+    }
+}
+
+/* Phones and small tablets: sidebar becomes an off-canvas drawer */
+@media (max-width: 768px) {
+
+    .sidebar {
+        width: 250px;
+        transform: translateX(-100%);
+        box-shadow: 2px 0 16px rgba(0, 0, 0, .15);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    /* the desktop collapse toggle is irrelevant once off-canvas */
+    .sidebar.collapsed {
+        width: 250px;
+    }
+
+    .sidebar.collapsed span {
+        display: inline;
+    }
+
+    .toggle-btn {
+        display: none;
+    }
+
+    .main-content,
+    .main-content.expanded {
+        margin-left: 0;
+    }
+
+    .mobile-menu {
+        display: block;
+    }
+
+    .topbar {
+        padding: 0 16px;
+        height: 62px;
+    }
+
+    .navbar-left {
+        gap: 12px;
+    }
+
+    .navbar-right {
+        gap: 14px;
+    }
+
+    .navbar-logo {
+        height: 36px;
+    }
+
+    .search-section {
+        padding: 16px 12px 4px;
+    }
+
+    .container-fluid.p-4 {
+        padding: 16px !important;
+    }
+
+    .dropdown-menu.notification-box {
+        width: min(300px, 90vw);
+    }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+
+    .class-content {
+        padding: 12px 16px;
+    }
+
+    .class-content h3 {
+        font-size: 18px;
+    }
+
+    .class-content p {
+        font-size: 13px;
+    }
+
+    .navbar-logo {
+        height: 30px;
+    }
+
+    .search-box .btn {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+}
