@@ -1,184 +1,477 @@
+
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 
-$teacher_id = $_SESSION['user_id'];
+/* ==========================================
+   LOGIN VALIDATION
+========================================== */
 
-$userQuery = mysqli_query($conn, "SELECT * FROM users WHERE id='$teacher_id'");
-$user = mysqli_fetch_assoc($userQuery);
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
 
-/* ------------------------------------------------------------
-   FILTERS (from the URL)
-   tab       = review | reviewed   (default: review)
-   class_id  = 0 (All Classes) or a specific class id
------------------------------------------------------------- */
-$tab = (isset($_GET['tab']) && $_GET['tab'] === 'reviewed') ? 'reviewed' : 'review';
+if (
+    !isset($_SESSION['role']) ||
+    $_SESSION['role'] !== 'teacher'
+) {
+    header("Location: login.php");
+    exit;
+}
 
-$selected_class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
+$teacher_id = (int)$_SESSION['user_id'];
 
-/* ------------------------------------------------------------
-   Classes taught by this teacher (for the filter dropdown)
-   NOTE: adjust "class_name" below if your classes table
-   uses a different column name for the class title.
------------------------------------------------------------- */
-$classStmt = mysqli_prepare($conn, "SELECT id, class_name FROM classes WHERE teacher_id = ? ORDER BY class_name ASC");
-mysqli_stmt_bind_param($classStmt, "i", $teacher_id);
-mysqli_stmt_execute($classStmt);
-$classListResult = mysqli_stmt_get_result($classStmt);
+function e($value) {
+    return htmlspecialchars(
+        (string)($value ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
+
+/* ==========================================
+   FETCH TEACHER INFORMATION
+========================================== */
+
+$userStmt = mysqli_prepare(
+    $conn,
+    "SELECT id, name, profile_image
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+);
+
+mysqli_stmt_bind_param(
+    $userStmt,
+    "i",
+    $teacher_id
+);
+
+mysqli_stmt_execute($userStmt);
+
+$userResult = mysqli_stmt_get_result($userStmt);
+$user = mysqli_fetch_assoc($userResult);
+
+mysqli_stmt_close($userStmt);
+
+if (!$user) {
+    header("Location: login.php");
+    exit;
+}
+
+/* ==========================================
+   FILTERS
+========================================== */
+
+$tab = (
+    isset($_GET['tab']) &&
+    $_GET['tab'] === 'reviewed'
+) ? 'reviewed' : 'review';
+
+$selected_class_id = isset($_GET['class_id'])
+    ? max(0, (int)$_GET['class_id'])
+    : 0;
+
+/* ==========================================
+   TEACHER CLASSES
+========================================== */
+
 $teacherClasses = [];
-while ($row = mysqli_fetch_assoc($classListResult)) {
+
+$classStmt = mysqli_prepare(
+    $conn,
+    "SELECT id, class_name
+     FROM classes
+     WHERE teacher_id = ?
+     ORDER BY class_name ASC"
+);
+
+mysqli_stmt_bind_param(
+    $classStmt,
+    "i",
+    $teacher_id
+);
+
+mysqli_stmt_execute($classStmt);
+
+$classResult = mysqli_stmt_get_result($classStmt);
+
+while ($row = mysqli_fetch_assoc($classResult)) {
     $teacherClasses[] = $row;
 }
 
-/* ------------------------------------------------------------
-   Build the assessment query
-   - always scoped to this teacher's classes
-   - optionally scoped to a single class
-   - "review"   -> at least 1 turned-in submission that is NOT graded yet
-   - "reviewed" -> has turned-in submissions AND all of them are graded
------------------------------------------------------------- */
+mysqli_stmt_close($classStmt);
+
+/* ==========================================
+   VALIDATE SELECTED CLASS
+========================================== */
+
+$validClassIds = array_map(
+    'intval',
+    array_column($teacherClasses, 'id')
+);
+
+if (
+    $selected_class_id > 0 &&
+    !in_array($selected_class_id, $validClassIds, true)
+) {
+    $selected_class_id = 0;
+}
+
+/* ==========================================
+   FETCH ASSESSMENTS AND STATISTICS
+========================================== */
+
 $params = [$teacher_id];
-$paramTypes = "i";
+$types = "i";
 
-$classFilterSql = "";
+$classFilter = "";
+
 if ($selected_class_id > 0) {
-    $classFilterSql = " AND a.class_id = ? ";
+    $classFilter = " AND a.class_id = ?";
     $params[] = $selected_class_id;
-    $paramTypes .= "i";
+    $types .= "i";
 }
 
-if ($tab === 'reviewed') {
-    // Only assessments that have submissions AND every one of them is graded.
-    $havingSql = "HAVING turned_in_count > 0 AND turned_in_count = graded_count";
-} else {
-    // "To Review" tab shows every assessment from every class,
-    // regardless of submission/grading status.
-    $havingSql = "";
-}
+/*
+  Turned In:
+    Submitted/done submissions.
+
+  Graded:
+    Submitted/done submissions with grade.
+
+  Assigned:
+    Students enrolled in the class.
+
+  This keeps the original submission statuses
+  used by your classroom system.
+*/
 
 $sql = "
     SELECT
-        a.*,
+        a.id,
+        a.class_id,
+        a.title,
+        a.type,
+        a.due_date,
         c.class_name,
-        (SELECT COUNT(*) FROM class_students cs
-            WHERE cs.class_id = a.class_id) AS assigned_count,
-        (SELECT COUNT(*) FROM submissions s
+
+        (
+            SELECT COUNT(*)
+            FROM class_students cs
+            WHERE cs.class_id = a.class_id
+            AND cs.archived = 0
+        ) AS assigned_count,
+
+        (
+            SELECT COUNT(*)
+            FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.status IN ('submitted','done')) AS turned_in_count,
-        (SELECT COUNT(*) FROM submissions s
+            AND s.status IN ('submitted', 'done')
+        ) AS turned_in_count,
+
+        (
+            SELECT COUNT(*)
+            FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.grade IS NOT NULL) AS graded_count
+            AND s.status IN ('submitted', 'done')
+            AND s.grade IS NOT NULL
+        ) AS graded_count
+
     FROM assessments a
-    INNER JOIN classes c ON c.id = a.class_id
+
+    INNER JOIN classes c
+        ON c.id = a.class_id
+
     WHERE c.teacher_id = ?
-    $classFilterSql
-    $havingSql
-    ORDER BY c.class_name ASC, a.due_date IS NULL, a.due_date ASC, a.id DESC
+
+    $classFilter
+
+    ORDER BY
+        c.class_name ASC,
+        a.due_date IS NULL,
+        a.due_date ASC,
+        a.id DESC
 ";
 
 $stmt = mysqli_prepare($conn, $sql);
-mysqli_stmt_bind_param($stmt, $paramTypes, ...$params);
+
+if (!$stmt) {
+    error_log(mysqli_error($conn));
+    http_response_code(500);
+    exit("Unable to load assessments.");
+}
+
+mysqli_stmt_bind_param(
+    $stmt,
+    $types,
+    ...$params
+);
+
 mysqli_stmt_execute($stmt);
+
 $result = mysqli_stmt_get_result($stmt);
 
-/* Group the flat result set by class name for the accordion */
-$grouped = [];
-while ($row = mysqli_fetch_assoc($result)) {
-    $className = $row['class_name'];
-    if (!isset($grouped[$className])) {
-        $grouped[$className] = [];
-    }
-    $grouped[$className][] = $row;
-}
-?>
+/* ==========================================
+   ORGANIZE ASSESSMENTS BY CLASS
+========================================== */
 
+$grouped = [];
+
+while ($row = mysqli_fetch_assoc($result)) {
+
+    $turnedIn = (int)$row['turned_in_count'];
+    $graded = (int)$row['graded_count'];
+
+    $fullyReviewed = (
+        $turnedIn > 0 &&
+        $graded >= $turnedIn
+    );
+
+    if ($tab === 'reviewed' && !$fullyReviewed) {
+        continue;
+    }
+
+    if ($tab === 'review' && $fullyReviewed) {
+        continue;
+    }
+
+    // Group by class ID to avoid merging
+    // classes with identical names.
+    $classId = (int)$row['class_id'];
+
+    if (!isset($grouped[$classId])) {
+        $grouped[$classId] = [
+            'class_name' => $row['class_name'],
+            'assessments' => []
+        ];
+    }
+
+    $grouped[$classId]['assessments'][] = $row;
+}
+
+mysqli_stmt_close($stmt);
+
+/* ==========================================
+   PROFILE IMAGE
+========================================== */
+
+$profileFile = trim(
+    (string)($user['profile_image'] ?? '')
+);
+
+$profileName = basename($profileFile);
+
+$defaultImages = [
+    '',
+    'null',
+    'default.png',
+    'default.jpg',
+    'default.jpeg'
+];
+
+$hasProfileImage = (
+    !in_array(
+        strtolower($profileName),
+        $defaultImages,
+        true
+    ) &&
+    is_file(__DIR__ . '/uploads/' . $profileName)
+);
+
+?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>To Review</title>
 
-    <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Teacher - To Review</title>
 
-    <link rel="stylesheet" href="teacher_class.css">
-    <link rel="stylesheet" href="teacher_class2.css">
+    <link rel="shortcut icon"
+          href="img/plmun logo.png"
+          type="image/x-icon">
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
     <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+          href="teacher_class.css?v=7">
+
+    <link rel="stylesheet"
+          href="teacher_class2.css?v=3">
+
 </head>
 
 <body>
 
-<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
-        <!-- SIDEBAR -->
-    <div class="sidebar" id="sidebar">
+<!-- ==========================================
+     SIDEBAR OVERLAY
+========================================== -->
 
-        <div class="sidebar-header">
-            <button class="toggle-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+<div class="sidebar-overlay"
+     id="sidebarOverlay"
+     onclick="closeMobileSidebar()">
+</div>
+
+<!-- ==========================================
+     SIDEBAR
+========================================== -->
+
+<div class="sidebar" id="sidebar">
+
+    <div class="sidebar-header">
+
+        <button
+            type="button"
+            class="toggle-btn"
+            onclick="toggleSidebar()"
+            aria-label="Toggle sidebar">
+
+            <i class="fa-solid fa-bars"></i>
+
+        </button>
+
+        <button
+            type="button"
+            class="sidebar-close-btn"
+            onclick="closeMobileSidebar()"
+            aria-label="Close sidebar">
+
+            <i class="fa-solid fa-xmark"></i>
+
+        </button>
+
+    </div>
+
+    <ul>
+
+        <li>
+            <a href="teacher_dashboard.php">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="teacher_classpage.php">
+                <i class="fa-solid fa-users"></i>
+                <span>Classes</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="teacher_to_review.php"
+               class="active-link">
+
+                <i class="fa-solid fa-clipboard-list"></i>
+                <span>To Review</span>
+
+            </a>
+        </li>
+
+        <li>
+            <a href="teacher_messages.php">
+                <i class="fa-regular fa-message"></i>
+                <span>Messages</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="teacher_performance.php">
+                <i class="fa-solid fa-chart-pie"></i>
+                <span>Performance</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="teacher_resources.php">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Resources</span>
+            </a>
+        </li>
+
+    </ul>
+
+    <div class="logout-btn">
+
+        <a href="logout.php">
+
+            <i class="fa-solid fa-right-from-bracket"></i>
+
+            <span>Logout</span>
+
+        </a>
+
+    </div>
+
+</div>
+
+<!-- ==========================================
+     MAIN CONTENT
+========================================== -->
+
+<div class="main-content" id="mainContent">
+
+    <!-- TOPBAR -->
+
+    <div class="topbar">
+
+        <div class="navbar-left">
+
+            <button
+                type="button"
+                class="mobile-menu"
+                onclick="mobileSidebar()"
+                aria-label="Open menu">
+
                 <i class="fa-solid fa-bars"></i>
+
             </button>
 
-            <button class="sidebar-close-btn" onclick="closeMobileSidebar()" aria-label="Close sidebar">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <img
+                src="img/classroom logo.png"
+                class="navbar-logo"
+                alt="PLMun Classroom">
+
         </div>
 
-        <ul>
+        <div class="navbar-right">
 
-            <li>
-                <a href="teacher_dashboard.php">
-                    <i class="fa-solid fa-house"></i>
-                    <span>Home</span>
-                </a>
-            </li>
+            <a href="profile.php"
+               class="profile-icon"
+               aria-label="My profile">
 
-            <li>
-                <a href="teacher_classpage.php">
-                    <i class="fa-solid fa-users"></i>
-                    <span>Classes</span>
-                </a>
-            </li>
+                <?php if ($hasProfileImage): ?>
 
-            <li>
-                <a href="teacher_to_review.php" class="active-link">
-                    <i class="fa-solid fa-clipboard-list"></i>
-                    <span>To Review</span>
-                </a>
-            </li>
+                    <img
+                        src="uploads/<?= e($profileName) ?>"
+                        alt="Profile Picture"
+                        onerror="
+                            this.style.display='none';
+                            this.nextElementSibling.style.display='flex';
+                        ">
 
-            <li>
-                <a href="teacher_messages.php">
-                    <i class="fa-regular fa-message"></i>
-                    <span>Messages</span>
-                </a>
-            </li>
+                    <i
+                        class="fa-solid fa-user"
+                        style="display:none;">
+                    </i>
 
-            <li>
-                <a href="teacher_performance.php">
-                    <i class="fa-solid fa-chart-pie"></i>
-                    <span>Performance</span>
-                </a>
-            </li>
+                <?php else: ?>
 
-            <li>
-                <a href="teacher_resources.php">
-                    <i class="fa-solid fa-book-open"></i>
-                    <span>Resources</span>
-                </a>
-            </li>
+                    <i class="fa-solid fa-user"></i>
 
-        </ul>
-
-        <div class="logout-btn">
-
-            <a href="logout.php">
-
-                <i class="fa-solid fa-right-from-bracket"></i>
-
-                <span>Logout</span>
+                <?php endif; ?>
 
             </a>
 
@@ -186,265 +479,400 @@ while ($row = mysqli_fetch_assoc($result)) {
 
     </div>
 
-    <div class="main-content" id="mainContent">
+    <!-- ======================================
+         REVIEW NAVIGATION
+    ======================================= -->
 
-        <!-- TOPBAR -->
-        <div class="topbar">
+    <div class="class-nav">
 
-            <div class="navbar-left">
+        <a
+            href="teacher_to_review.php?tab=review<?= $selected_class_id ? '&class_id='.$selected_class_id : '' ?>"
+            class="<?= $tab === 'review' ? 'nav-active' : '' ?>">
 
-                <button class="mobile-menu"
-                        onclick="mobileSidebar()">
+            To Review
 
-                    <i class="fa-solid fa-bars"></i>
+        </a>
 
-                </button>
+        <a
+            href="teacher_to_review.php?tab=reviewed<?= $selected_class_id ? '&class_id='.$selected_class_id : '' ?>"
+            class="<?= $tab === 'reviewed' ? 'nav-active' : '' ?>">
 
-                <img src="img/classroom logo.png"
-                    class="navbar-logo">
+            Reviewed
 
-            </div>
+        </a>
 
-            <div class="navbar-right">
-                
-                <?php
-                $profileFile = $user['profile_image'] ?? '';
-                $hasProfileImage = !empty($profileFile)
-                    && !in_array(strtolower($profileFile), ['default.png', 'default.jpg', 'default.jpeg', 'null'])
-                    && file_exists(__DIR__ . '/uploads/' . basename($profileFile));
-            ?>
-            <a href="profile.php" class="profile-icon">
-                <?php if($hasProfileImage): ?>
-                    <img src="uploads/<?php echo htmlspecialchars(basename($profileFile)); ?>"
-                         alt="Profile"
-                        onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend','<i class=&quot;fa-solid fa-user&quot;></i>');">
-                <?php else: ?>
-                    <i class="fa-solid fa-user"></i>
-                <?php endif; ?>
-            </a>
+    </div>
 
-            </div>
+    <!-- ======================================
+         REVIEW CONTENT
+    ======================================= -->
 
-        </div>
+    <div class="container py-4">
 
-        <div class="class-nav">
+        <div class="assessment-page">
 
-            <a href="teacher_to_review.php?tab=review<?php echo $selected_class_id ? '&class_id='.$selected_class_id : ''; ?>"
-               class="<?php echo $tab === 'review' ? 'nav-active' : ''; ?>">
-                To Review
-            </a>
+            <!-- CLASS FILTER -->
 
-            <a href="teacher_to_review.php?tab=reviewed<?php echo $selected_class_id ? '&class_id='.$selected_class_id : ''; ?>"
-               class="<?php echo $tab === 'reviewed' ? 'nav-active' : ''; ?>">
-                Reviewed
-            </a>
+            <div class="assessment-actions">
 
-        </div>
+                <div class="topic-filter-wrap">
 
-        <div class="container py-4">
-            <!-- CONTENT -->
+                    <select
+                        class="topic-filter-select"
+                        id="classFilter"
+                        onchange="filterByClass(this.value)">
 
-            <div class="assessment-page">
+                        <option
+                            value="0"
+                            <?= $selected_class_id === 0 ? 'selected' : '' ?>>
 
-                <div class="assessment-actions">
+                            All Classes
 
-                    <div class="topic-filter-wrap">
-                        <select
-                            class="topic-filter-select"
-                            id="classFilter"
-                            onchange="filterByClass(this.value)">
+                        </option>
 
-                            <option value="0" <?php echo $selected_class_id === 0 ? 'selected' : ''; ?>>
-                                All Classes
+                        <?php foreach ($teacherClasses as $c): ?>
+
+                            <option
+                                value="<?= (int)$c['id'] ?>"
+                                <?= $selected_class_id === (int)$c['id'] ? 'selected' : '' ?>>
+
+                                <?= e($c['class_name']) ?>
+
                             </option>
 
-                            <?php foreach ($teacherClasses as $c): ?>
-                            <option value="<?php echo $c['id']; ?>"
-                                <?php echo $selected_class_id === (int)$c['id'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($c['class_name']); ?>
-                            </option>
-                            <?php endforeach; ?>
+                        <?php endforeach; ?>
 
-                        </select>
-                        <i class="fa-solid fa-chevron-down topic-filter-icon"></i>
-                    </div>
+                    </select>
+
+                    <i class="fa-solid fa-chevron-down topic-filter-icon"></i>
 
                 </div>
 
-                <?php if (empty($grouped)): ?>
+            </div>
 
-                    <div class="empty-state">
-                        <i class="fa-regular fa-circle-check"></i>
-                        <p>
-                            <?php echo $tab === 'review'
-                                ? "No assessments found yet."
-                                : "No fully graded assessments yet."; ?>
-                        </p>
-                    </div>
+            <!-- ==================================
+                 ASSESSMENT LIST
+            =================================== -->
 
-                <?php else: ?>
+            <?php if (empty($grouped)): ?>
 
-                    <?php foreach ($grouped as $className => $assessments): ?>
+                <div class="empty-state">
+
+                    <i class="fa-regular fa-circle-check"></i>
+
+                    <p>
+                        <?php if ($tab === 'review'): ?>
+
+                            No assessments awaiting review.
+
+                        <?php else: ?>
+
+                            No fully reviewed assessments yet.
+
+                        <?php endif; ?>
+                    </p>
+
+                </div>
+
+            <?php else: ?>
+
+                <?php foreach ($grouped as $classGroup): ?>
 
                     <div class="topic-block mb-3">
 
+                        <!-- CLASS TITLE -->
+
                         <div class="topic-header-bar">
+
                             <div class="topic-header-left">
-                                <button class="topic-collapse-btn" onclick="toggleTopic(this)">
+
+                                <button
+                                    type="button"
+                                    class="topic-collapse-btn"
+                                    onclick="toggleTopic(this)"
+                                    aria-label="Toggle class assessments"
+                                    aria-expanded="true">
+
                                     <i class="fa-solid fa-chevron-down"></i>
+
                                 </button>
+
                                 <span class="topic-name">
-                                    <?php echo htmlspecialchars($className); ?>
+
+                                    <?= e($classGroup['class_name']) ?>
+
                                 </span>
+
                             </div>
+
                         </div>
 
-                        
+                        <!-- ASSESSMENTS -->
 
                         <div class="topic-body">
 
-                            <?php foreach ($assessments as $assessment): ?>
-                            <div class="assessment-item">
+                            <?php foreach ($classGroup['assessments'] as $assessment): ?>
 
-                                <div class="assessment-top-row">
+                                <div class="assessment-item">
 
-                                    <div class="assessment-title-wrap">
-                                        <i class="fa-regular fa-clipboard assessment-icon"></i>
-                                        <a href="teacher_submissions.php?id=<?php echo $assessment['id']; ?>" class="assessment-title assessment-title-link">
-                                            <?php echo htmlspecialchars($assessment['title']); ?>
-                                        </a>
+                                    <!-- ASSESSMENT TITLE -->
+
+                                    <div class="assessment-top-row">
+
+                                        <div class="assessment-title-wrap">
+
+                                            <i class="fa-regular fa-clipboard assessment-icon"></i>
+
+                                            <a
+                                                href="teacher_submissions.php?id=<?= (int)$assessment['id'] ?>"
+                                                class="assessment-title assessment-title-link">
+
+                                                <?= e($assessment['title']) ?>
+
+                                            </a>
+
+                                        </div>
+
+                                        <!-- DUE DATE -->
+
+                                        <div class="assessment-due-wrap">
+
+                                            <span class="due-label">
+                                                Due
+                                            </span>
+
+                                            <span class="due-date">
+
+                                                <?php if (!empty($assessment['due_date'])): ?>
+
+                                                    <?= e(date(
+                                                        "F d, Y",
+                                                        strtotime($assessment['due_date'])
+                                                    )) ?>
+
+                                                <?php else: ?>
+
+                                                    No due date
+
+                                                <?php endif; ?>
+
+                                            </span>
+
+                                        </div>
+
                                     </div>
 
-                                    <div class="assessment-due-wrap">
-                                        <span class="due-label">Due</span>
-                                        <span class="due-date">
-                                            <?php echo $assessment['due_date']
-                                                ? date("F d, Y", strtotime($assessment['due_date']))
-                                                : 'No due date'; ?>
-                                        </span>
+                                    <!-- ASSESSMENT STATISTICS -->
+
+                                    <div class="assessment-stats-row">
+
+                                        <div class="posted-label">
+
+                                            <?= e($assessment['type']) ?>
+
+                                        </div>
+
+                                        <div class="stat-cell">
+
+                                            <strong>
+                                                <?= (int)$assessment['turned_in_count'] ?>
+                                            </strong>
+
+                                            <span>
+                                                Turned In
+                                            </span>
+
+                                        </div>
+
+                                        <div class="stat-cell">
+
+                                            <strong>
+                                                <?= (int)$assessment['assigned_count'] ?>
+                                            </strong>
+
+                                            <span>
+                                                Assigned
+                                            </span>
+
+                                        </div>
+
+                                        <div class="stat-cell">
+
+                                            <strong>
+                                                <?= (int)$assessment['graded_count'] ?>
+                                            </strong>
+
+                                            <span>
+                                                Graded
+                                            </span>
+
+                                        </div>
+
                                     </div>
 
                                 </div>
 
-                                <div class="assessment-stats-row">
-
-                                    <div class="posted-label"><?php echo htmlspecialchars($assessment['type']); ?></div>
-                                    <div class="stat-cell">
-                                        <strong><?php echo (int) $assessment['turned_in_count']; ?></strong>
-                                        <span>Turned In</span>
-                                    </div>
-                                    <div class="stat-cell">
-                                        <strong><?php echo (int) $assessment['assigned_count']; ?></strong>
-                                        <span>Assigned</span>
-                                    </div>
-                                    <div class="stat-cell">
-                                        <strong><?php echo (int) $assessment['graded_count']; ?></strong>
-                                        <span>Graded</span>
-                                    </div>
-
-                                </div>
-
-                            </div>
                             <?php endforeach; ?>
 
                         </div>
 
                     </div>
 
-                    <?php endforeach; ?>
+                <?php endforeach; ?>
 
-                <?php endif; ?>
+            <?php endif; ?>
 
-            </div>
         </div>
 
     </div>
 
-    <script>
-/* =========================================================
-   SIDEBAR RESPONSIVENESS
-========================================================= */
+</div>
 
-const sidebar = document.getElementById("sidebar");
-const mainContent = document.getElementById("mainContent");
-const sidebarOverlay = document.getElementById("sidebarOverlay");
+<!-- ==========================================
+     JAVASCRIPT
+========================================== -->
+
+<script>
+
+const sidebar = document.getElementById('sidebar');
+const mainContent = document.getElementById('mainContent');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+/* ==========================================
+   SIDEBAR RESPONSIVENESS
+========================================== */
 
 function toggleSidebar() {
-    // Desktop sidebar collapse
-    if (window.innerWidth > 768) {
-        sidebar.classList.toggle("collapsed");
-        mainContent.classList.toggle("expanded");
+
+    if (window.innerWidth <= 768) {
+        mobileSidebar();
+        return;
     }
+
+    sidebar.classList.toggle('collapsed');
+
+    mainContent.classList.toggle('expanded');
 }
 
 function mobileSidebar() {
-    // Open mobile sidebar
-    if (window.innerWidth <= 768) {
-        sidebar.classList.add("show");
-        sidebarOverlay.classList.add("show");
-        document.body.style.overflow = "hidden";
+
+    if (window.innerWidth > 768) {
+        return;
     }
+
+    sidebar.classList.add('show');
+
+    sidebarOverlay.classList.add('show');
+
+    document.body.style.overflow = 'hidden';
 }
 
 function closeMobileSidebar() {
-    sidebar.classList.remove("show");
-    sidebarOverlay.classList.remove("show");
-    document.body.style.overflow = "";
+
+    sidebar.classList.remove('show');
+
+    sidebarOverlay.classList.remove('show');
+
+    document.body.style.overflow = '';
 }
 
-// Close sidebar when clicking a navigation link on mobile
-document.querySelectorAll(".sidebar ul a, .logout-btn a").forEach(link => {
-    link.addEventListener("click", function() {
+document.querySelectorAll(
+    '.sidebar ul a, .logout-btn a'
+).forEach(function(link) {
+
+    link.addEventListener('click', function() {
+
         if (window.innerWidth <= 768) {
             closeMobileSidebar();
         }
+
     });
+
 });
 
-// Close sidebar when pressing Escape
-document.addEventListener("keydown", function(event) {
-    if (event.key === "Escape") {
+document.addEventListener('keydown', function(event) {
+
+    if (event.key === 'Escape') {
         closeMobileSidebar();
     }
+
 });
 
-// Reset mobile sidebar when switching back to desktop
-window.addEventListener("resize", function() {
+window.addEventListener('resize', function() {
+
     if (window.innerWidth > 768) {
         closeMobileSidebar();
     }
+
 });
 
-/* =========================================================
-   COLLAPSE CLASS / TOPIC
-========================================================= */
+/* ==========================================
+   COLLAPSE CLASS
+========================================== */
 
 function toggleTopic(btn) {
-    const body = btn.closest(".topic-block").querySelector(".topic-body");
 
-    body.classList.toggle("collapsed");
+    const topicBlock = btn.closest('.topic-block');
 
-    const icon = btn.querySelector("i");
+    if (!topicBlock) return;
 
-    icon.classList.toggle("fa-chevron-down");
-    icon.classList.toggle("fa-chevron-up");
+    const topicBody = topicBlock.querySelector('.topic-body');
+
+    if (!topicBody) return;
+
+    topicBody.classList.toggle('collapsed');
+
+    const isExpanded = !topicBody.classList.contains('collapsed');
+
+    btn.setAttribute(
+        'aria-expanded',
+        String(isExpanded)
+    );
+
+    const icon = btn.querySelector('i');
+
+    if (icon) {
+
+        icon.classList.toggle(
+            'fa-chevron-down',
+            isExpanded
+        );
+
+        icon.classList.toggle(
+            'fa-chevron-up',
+            !isExpanded
+        );
+
+    }
 }
 
-/* =========================================================
-   CLASS FILTER
-========================================================= */
+/* ==========================================
+   FILTER CLASSES
+========================================== */
 
 function filterByClass(classId) {
-    const tab = "<?php echo $tab; ?>";
 
-    let url = "teacher_to_review.php?tab=" + tab;
+    const tab = <?= json_encode($tab) ?>;
 
-    if (classId && classId !== "0") {
-        url += "&class_id=" + encodeURIComponent(classId);
+    const url = new URL(
+        'teacher_to_review.php',
+        window.location.href
+    );
+
+    url.searchParams.set('tab', tab);
+
+    if (classId && classId !== '0') {
+
+        url.searchParams.set(
+            'class_id',
+            classId
+        );
+
     }
 
-    window.location.href = url;
+    window.location.href = url.toString();
 }
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
