@@ -66,8 +66,8 @@ a {
 
 .sidebar-header {
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     padding: 14px 15px;
     border-bottom: 1px solid #e0e0e0;
 }
@@ -78,7 +78,7 @@ a {
     font-size: 22px;
     cursor: pointer;
     color: #444;
-    padding: 6px;
+    padding: 4px;
     border-radius: 6px;
 }
 
@@ -1162,4 +1162,31 @@ a {
         animation-duration: .01ms !important;
     }
 
+}
+
+
+/* =========================================
+   ALL ASSIGNED INSTRUCTORS
+========================================= */
+
+.class-content .teacher-name {
+    color: #5f6368;
+    font-size: 13px;
+    line-height: 1.7;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.class-content .teacher-name i {
+    color: #3f87b5;
+    margin-right: 3px;
+}
+
+@media (max-width: 576px) {
+    .class-content .teacher-name {
+        font-size: 12px;
+        line-height: 1.6;
+    }
 }

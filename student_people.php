@@ -1,18 +1,20 @@
-
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 
 /* =========================================
-   LOGIN VALIDATION
+   LOGIN AND ROLE VALIDATION
 ========================================= */
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    empty($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'student'
+) {
     header("Location: login.php");
     exit();
 }
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+if (!isset($_GET['id']) || !ctype_digit((string)$_GET['id'])) {
     die("Class not found");
 }
 
@@ -31,10 +33,6 @@ function e($value) {
     );
 }
 
-/* =========================================
-   PROFILE IMAGE VALIDATION
-========================================= */
-
 function getProfileImage($filename) {
 
     $filename = trim((string)($filename ?? ''));
@@ -52,7 +50,6 @@ function getProfileImage($filename) {
         return null;
     }
 
-    // Prevent directory traversal.
     $safeName = basename($filename);
 
     $imagePath = __DIR__ . '/uploads/' . $safeName;
@@ -77,8 +74,13 @@ $userStmt = mysqli_prepare(
     "SELECT id, name, profile_image
      FROM users
      WHERE id = ?
+       AND role = 'student'
      LIMIT 1"
 );
+
+if (!$userStmt) {
+    die("Unable to load student information.");
+}
 
 mysqli_stmt_bind_param($userStmt, "i", $student_id);
 mysqli_stmt_execute($userStmt);
@@ -97,21 +99,62 @@ if (!$user) {
 $profileImageFile = getProfileImage($user['profile_image'] ?? '');
 
 /* =========================================
-   GET CLASS AND TEACHER INFORMATION
+   CHECK ACTIVE CLASS ENROLLMENT
+========================================= */
+
+$membershipStmt = mysqli_prepare(
+    $conn,
+    "SELECT id
+     FROM class_students
+     WHERE class_id = ?
+       AND student_id = ?
+       AND (archived = 0 OR archived IS NULL)
+     LIMIT 1"
+);
+
+if (!$membershipStmt) {
+    die("Unable to verify class enrollment.");
+}
+
+mysqli_stmt_bind_param(
+    $membershipStmt,
+    "ii",
+    $class_id,
+    $student_id
+);
+
+mysqli_stmt_execute($membershipStmt);
+
+$membershipResult = mysqli_stmt_get_result($membershipStmt);
+$isEnrolled = mysqli_num_rows($membershipResult) > 0;
+
+mysqli_stmt_close($membershipStmt);
+
+if (!$isEnrolled) {
+    http_response_code(403);
+    die("Access denied. You are not enrolled in this class.");
+}
+
+/* =========================================
+   GET CLASS AND PRIMARY INSTRUCTOR
 ========================================= */
 
 $classStmt = mysqli_prepare(
     $conn,
     "SELECT
-        classes.*,
-        users.name AS teacher_name,
-        users.profile_image AS teacher_profile_image
-     FROM classes
-     INNER JOIN users
-        ON classes.teacher_id = users.id
-     WHERE classes.id = ?
+        c.*,
+        u.name AS teacher_name,
+        u.profile_image AS teacher_profile_image
+     FROM classes c
+     LEFT JOIN users u
+        ON c.teacher_id = u.id
+     WHERE c.id = ?
      LIMIT 1"
 );
+
+if (!$classStmt) {
+    die("Unable to load class information.");
+}
 
 mysqli_stmt_bind_param($classStmt, "i", $class_id);
 mysqli_stmt_execute($classStmt);
@@ -122,30 +165,86 @@ $class = mysqli_fetch_assoc($classResult);
 mysqli_stmt_close($classStmt);
 
 if (!$class) {
-    die("Class not found");
+    die("Class not found.");
 }
 
-// Validate teacher image.
 $teacherImageFile = getProfileImage(
     $class['teacher_profile_image'] ?? ''
 );
 
 /* =========================================
-   GET STUDENTS IN THE CLASS
+   GET CO-INSTRUCTORS
+========================================= */
+
+$coInstructors = [];
+
+$coInstructorStmt = mysqli_prepare(
+    $conn,
+    "SELECT DISTINCT
+        u.id,
+        u.name,
+        u.profile_image
+     FROM class_instructors ci
+     INNER JOIN users u
+        ON ci.teacher_id = u.id
+     WHERE ci.class_id = ?
+       AND ci.teacher_id != COALESCE(?, 0)
+       AND u.role = 'teacher'
+     ORDER BY u.name ASC"
+);
+
+if (!$coInstructorStmt) {
+    die(
+        "Unable to load co-instructors. " .
+        "Please check that the class_instructors table exists."
+    );
+}
+
+$primaryTeacherId = (int)($class['teacher_id'] ?? 0);
+
+mysqli_stmt_bind_param(
+    $coInstructorStmt,
+    "ii",
+    $class_id,
+    $primaryTeacherId
+);
+
+mysqli_stmt_execute($coInstructorStmt);
+
+$coInstructorResult = mysqli_stmt_get_result($coInstructorStmt);
+
+while ($instructor = mysqli_fetch_assoc($coInstructorResult)) {
+    $instructor['profile_image_file'] = getProfileImage(
+        $instructor['profile_image'] ?? ''
+    );
+
+    $coInstructors[] = $instructor;
+}
+
+mysqli_stmt_close($coInstructorStmt);
+
+/* =========================================
+   GET ACTIVE STUDENTS IN THE CLASS
 ========================================= */
 
 $studentsStmt = mysqli_prepare(
     $conn,
-    "SELECT
-        users.id,
-        users.name,
-        users.profile_image
-     FROM class_students
-     INNER JOIN users
-        ON class_students.student_id = users.id
-     WHERE class_students.class_id = ?
-     ORDER BY users.name ASC"
+    "SELECT DISTINCT
+        u.id,
+        u.name,
+        u.profile_image
+     FROM class_students cs
+     INNER JOIN users u
+        ON cs.student_id = u.id
+     WHERE cs.class_id = ?
+       AND (cs.archived = 0 OR cs.archived IS NULL)
+       AND u.role = 'student'
+     ORDER BY u.name ASC"
 );
+
+if (!$studentsStmt) {
+    die("Unable to load students.");
+}
 
 mysqli_stmt_bind_param($studentsStmt, "i", $class_id);
 mysqli_stmt_execute($studentsStmt);
@@ -257,41 +356,105 @@ $studentCount = mysqli_num_rows($studentsQuery);
 
     <!-- TEACHER -->
 
+    
+    <!-- PRIMARY INSTRUCTOR -->
+
     <div class="people-section">
 
         <h4 class="section-title">Teacher</h4>
 
-        <div class="people-card">
+        <?php if (!empty($class['teacher_name'])): ?>
 
-            <?php if ($teacherImageFile): ?>
+            <div class="people-card">
 
-                <img
-                    src="uploads/<?php echo e(rawurlencode($teacherImageFile)); ?>"
-                    class="people-avatar"
-                    alt="<?php echo e($class['teacher_name']); ?>"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                >
+                <?php if ($teacherImageFile): ?>
 
-                <div class="people-avatar people-avatar-default" style="display:none;">
-                    <i class="fa-solid fa-user"></i>
+                    <img
+                        src="uploads/<?php echo e(rawurlencode($teacherImageFile)); ?>"
+                        class="people-avatar"
+                        alt="<?php echo e($class['teacher_name']); ?>"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                    >
+
+                    <div class="people-avatar people-avatar-default" style="display:none;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+
+                <?php else: ?>
+
+                    <div class="people-avatar people-avatar-default">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+
+                <?php endif; ?>
+
+                <div>
+                    <h5><?php echo e($class['teacher_name']); ?></h5>
+                    <small class="text-muted">Primary Instructor</small>
                 </div>
 
-            <?php else: ?>
+            </div>
 
+        <?php else: ?>
+
+            <div class="people-card">
                 <div class="people-avatar people-avatar-default">
                     <i class="fa-solid fa-user"></i>
                 </div>
 
-            <?php endif; ?>
-
-            <div>
-                <h5><?php echo e($class['teacher_name']); ?></h5>
-                <small class="text-muted">Instructor</small>
+                <div>
+                    <h5>Unassigned</h5>
+                    <small class="text-muted">No primary instructor assigned</small>
+                </div>
             </div>
 
-        </div>
+        <?php endif; ?>
+
+
+        <!-- CO-INSTRUCTORS -->
+
+        <?php if (!empty($coInstructors)): ?>
+
+            <h4 class="section-title mt-4">Co-Instructors</h4>
+
+            <?php foreach ($coInstructors as $instructor): ?>
+
+                <div class="people-card">
+
+                    <?php if ($instructor['profile_image_file']): ?>
+
+                        <img
+                            src="uploads/<?php echo e(rawurlencode($instructor['profile_image_file'])); ?>"
+                            class="people-avatar"
+                            alt="<?php echo e($instructor['name']); ?>"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                        >
+
+                        <div class="people-avatar people-avatar-default" style="display:none;">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+
+                    <?php else: ?>
+
+                        <div class="people-avatar people-avatar-default">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+
+                    <?php endif; ?>
+
+                    <div>
+                        <h5><?php echo e($instructor['name']); ?></h5>
+                        <small class="text-muted">Co-Instructor</small>
+                    </div>
+
+                </div>
+
+            <?php endforeach; ?>
+
+        <?php endif; ?>
 
     </div>
+
 
 
     

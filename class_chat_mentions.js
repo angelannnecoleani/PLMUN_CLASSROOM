@@ -191,7 +191,13 @@ window.ChatMentions = (function () {
 
             const role = document.createElement('div');
             role.className = 'mention-role';
-            role.textContent = m.role === 'all' ? 'Notify everyone' : (m.role === 'teacher' ? 'Teacher' : 'Student');
+            role.textContent = m.role === 'all'
+                ? 'Notify everyone'
+                : (m.role === 'teacher'
+                    ? 'Primary Instructor'
+                    : (m.role === 'co_instructor'
+                        ? 'Co-Instructor'
+                        : 'Student'));
 
             row.append(av, nm, role);
             row.addEventListener('mousedown', function (e) { e.preventDefault(); });   // keep focus in the box

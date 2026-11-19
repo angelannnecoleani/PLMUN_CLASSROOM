@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 include 'database.php';
@@ -222,6 +221,7 @@ $hasProfileImage =
 ========================================================= */
 $announcements = [];
 $students = [];
+$instructors = [];
 $annAtt = [];
 
 /* -------------------------
@@ -264,6 +264,46 @@ if ($tab === 'stream') {
 ------------------------- */
 if ($tab === 'people') {
 
+    /*
+       All assigned instructors:
+       - Primary instructor from classes.teacher_id
+       - Co-instructors from class_instructors
+
+       DISTINCT prevents showing the same person twice
+       if they appear in both places.
+    */
+    $instructors = fetchAllById(
+        $conn,
+        "SELECT DISTINCT
+            u.id,
+            u.name,
+            u.email,
+            u.profile_image,
+            CASE
+                WHEN u.id = c.teacher_id THEN 'Primary Instructor'
+                ELSE 'Co-instructor'
+            END AS instructor_role
+         FROM classes c
+         INNER JOIN users u
+            ON (
+                u.id = c.teacher_id
+                OR EXISTS (
+                    SELECT 1
+                    FROM class_instructors ci
+                    WHERE ci.class_id = c.id
+                      AND ci.teacher_id = u.id
+                )
+            )
+         WHERE c.id = ?
+         ORDER BY
+            CASE
+                WHEN u.id = c.teacher_id THEN 0
+                ELSE 1
+            END,
+            u.name ASC",
+        $id
+    );
+
     $students = fetchAllById(
         $conn,
         "SELECT
@@ -275,7 +315,7 @@ if ($tab === 'people') {
          INNER JOIN users u
             ON cs.student_id = u.id
          WHERE cs.class_id = ?
-           AND cs.archived = 0
+           AND (cs.archived = 0 OR cs.archived IS NULL)
          ORDER BY u.name ASC",
         $id
     );
@@ -914,20 +954,43 @@ if ($tab === 'people') {
 
                     <div class="pc-section-heading">
                         <i class="fa-solid fa-chalkboard-user"></i>
-                        Instructor
+                        Instructors (<?php echo count($instructors); ?>)
                     </div>
 
                     <div class="people-section mb-4">
 
-                        <div class="pc-person-row">
+                        <?php if (!$instructors): ?>
 
-                            <?php echo avatarHtml($teacherImage); ?>
-
-                            <div class="pc-person-info">
-                                <strong><?php echo e($teacherName); ?></strong>
+                            <div class="people-empty">
+                                No instructors have been assigned to this class yet.
                             </div>
 
-                        </div>
+                        <?php endif; ?>
+
+                        <?php foreach ($instructors as $ins): ?>
+
+                            <div class="pc-person-row">
+
+                                <?php echo avatarHtml($ins['profile_image'] ?? ''); ?>
+
+                                <div class="pc-person-info">
+
+                                    <strong>
+                                        <?php echo e($ins['name']); ?>
+                                    </strong>
+
+                                    <small>
+                                        <?php echo e($ins['instructor_role']); ?>
+                                        <?php if (!empty($ins['email'])): ?>
+                                            &middot; <?php echo e($ins['email']); ?>
+                                        <?php endif; ?>
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        <?php endforeach; ?>
 
                     </div>
 

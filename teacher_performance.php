@@ -1,17 +1,32 @@
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 
 /* =========================================
    TEACHER LOGIN VALIDATION
 ========================================= */
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    empty($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'teacher'
+) {
     header("Location: login.php");
     exit();
 }
 
-$teacher_id = (int) $_SESSION['user_id'];
+$teacher_id = (int)$_SESSION['user_id'];
+
+/* =========================================
+   HELPER FUNCTION
+========================================= */
+
+function e($value) {
+    return htmlspecialchars(
+        (string)($value ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
 
 /* =========================================
    GET TEACHER INFORMATION
@@ -19,14 +34,24 @@ $teacher_id = (int) $_SESSION['user_id'];
 
 $userQuery = mysqli_prepare(
     $conn,
-    "SELECT * FROM users WHERE id = ?"
+    "SELECT id, name, profile_image
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
 );
+
+if (!$userQuery) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load teacher information.");
+}
 
 mysqli_stmt_bind_param($userQuery, "i", $teacher_id);
 mysqli_stmt_execute($userQuery);
 
 $userResult = mysqli_stmt_get_result($userQuery);
 $user = mysqli_fetch_assoc($userResult);
+
+mysqli_stmt_close($userQuery);
 
 if (!$user) {
     session_destroy();
@@ -35,28 +60,60 @@ if (!$user) {
 }
 
 /* =========================================
-   GET ALL CLASSES OWNED BY TEACHER
+   GET PRIMARY AND CO-INSTRUCTOR CLASSES
 ========================================= */
 
 $classesQuery = mysqli_prepare(
     $conn,
     "
     SELECT
-        classes.*,
-        COUNT(DISTINCT cs.student_id) AS student_count,
+        c.*,
+
+        COUNT(
+            DISTINCT CASE
+                WHEN cs.archived = 0 OR cs.archived IS NULL
+                THEN cs.student_id
+            END
+        ) AS student_count,
+
         COUNT(DISTINCT a.id) AS assessment_count
-    FROM classes
+
+    FROM classes c
+
     LEFT JOIN class_students cs
-        ON cs.class_id = classes.id
+        ON cs.class_id = c.id
+
     LEFT JOIN assessments a
-        ON a.class_id = classes.id
-    WHERE classes.teacher_id = ?
-    GROUP BY classes.id
-    ORDER BY classes.class_name ASC
+        ON a.class_id = c.id
+
+    WHERE
+        c.teacher_id = ?
+
+        OR EXISTS (
+            SELECT 1
+            FROM class_instructors ci
+            WHERE ci.class_id = c.id
+              AND ci.teacher_id = ?
+        )
+
+    GROUP BY c.id
+
+    ORDER BY c.class_name ASC
     "
 );
 
-mysqli_stmt_bind_param($classesQuery, "i", $teacher_id);
+if (!$classesQuery) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load class performance.");
+}
+
+mysqli_stmt_bind_param(
+    $classesQuery,
+    "ii",
+    $teacher_id,
+    $teacher_id
+);
+
 mysqli_stmt_execute($classesQuery);
 
 $classesResult = mysqli_stmt_get_result($classesQuery);
@@ -65,17 +122,29 @@ $classesResult = mysqli_stmt_get_result($classesQuery);
    PROFILE IMAGE VALIDATION
 ========================================= */
 
-$profileFile = $user['profile_image'] ?? '';
+$profileFile = trim(
+    (string)($user['profile_image'] ?? '')
+);
 
-$hasProfileImage = !empty($profileFile)
-    && !in_array(
-        strtolower($profileFile),
-        ['default.png', 'default.jpg', 'default.jpeg', 'null'],
+$profileName = basename($profileFile);
+
+$defaultImages = [
+    '',
+    'null',
+    'default.png',
+    'default.jpg',
+    'default.jpeg'
+];
+
+$hasProfileImage = (
+    !in_array(
+        strtolower($profileName),
+        $defaultImages,
         true
     )
-    && file_exists(
-        __DIR__ . '/uploads/' . basename($profileFile)
-    );
+    &&
+    is_file(__DIR__ . '/uploads/' . $profileName)
+);
 
 ?>
 <!DOCTYPE html>
@@ -159,12 +228,6 @@ $hasProfileImage = !empty($profileFile)
             <a href="teacher_performance.php" class="active" aria-current="page">
                 <i class="fa-solid fa-chart-pie"></i>
                 <span>Performance</span>
-            </a>
-        </li>
-        <li>
-            <a href="teacher_resources.php">
-                <i class="fa-solid fa-book-open"></i>
-                <span>Resources</span>
             </a>
         </li>
     </ul>

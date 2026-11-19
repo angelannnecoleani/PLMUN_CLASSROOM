@@ -1,17 +1,19 @@
-
 <?php
 session_start();
-include 'database.php';
-include 'auth_helpers.php';
+require_once 'database.php';
+require_once 'auth_helpers.php';
 
 $role = $_SESSION['role'] ?? '';
 
-if (empty($_SESSION['user_id']) || !in_array($role, ['teacher', 'program_chair'], true)) {
+if (
+    empty($_SESSION['user_id']) ||
+    !in_array($role, ['teacher', 'program_chair'], true)
+) {
     header("Location: login.php");
     exit;
 }
 
-if (!isset($_GET['id'])) {
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Class not found");
 }
 
@@ -19,43 +21,131 @@ $class_id   = (int) $_GET['id'];
 $teacher_id = (int) $_SESSION['user_id'];
 $isChair    = ($role === 'program_chair');
 
-/* Teacher: own class / Program chair: class in their program */
-$class = getClassAccess($conn, $class_id, $teacher_id, $role);
+/* =====================================================
+   CLASS ACCESS
+   Teacher: Primary instructor OR additional instructor
+   Program Chair: Existing program-based access
+===================================================== */
+
+if ($isChair) {
+
+    $class = getClassAccess(
+        $conn,
+        $class_id,
+        $teacher_id,
+        $role
+    );
+
+} else {
+
+    $classStmt = mysqli_prepare($conn, "
+        SELECT c.*
+        FROM classes c
+        WHERE c.id = ?
+        AND (
+            c.teacher_id = ?
+            OR EXISTS (
+                SELECT 1
+                FROM class_instructors ci
+                WHERE ci.class_id = c.id
+                AND ci.teacher_id = ?
+            )
+        )
+        LIMIT 1
+    ");
+
+    if (!$classStmt) {
+        die("Database error: Unable to prepare class access query.");
+    }
+
+    mysqli_stmt_bind_param(
+        $classStmt,
+        "iii",
+        $class_id,
+        $teacher_id,
+        $teacher_id
+    );
+
+    mysqli_stmt_execute($classStmt);
+
+    $classResult = mysqli_stmt_get_result($classStmt);
+    $class = mysqli_fetch_assoc($classResult);
+
+    mysqli_stmt_close($classStmt);
+}
 
 if (!$class) {
     http_response_code(403);
     die("Access denied. This class is not assigned to you.");
 }
 
-/* Fetch current user */
-$uStmt = mysqli_prepare($conn, "SELECT * FROM users WHERE id = ?");
+/* =====================================================
+   FETCH CURRENT USER
+===================================================== */
+
+$uStmt = mysqli_prepare(
+    $conn,
+    "SELECT * FROM users WHERE id = ? LIMIT 1"
+);
+
+if (!$uStmt) {
+    die("Database error: Unable to prepare user query.");
+}
+
 mysqli_stmt_bind_param($uStmt, "i", $teacher_id);
 mysqli_stmt_execute($uStmt);
-$user = mysqli_fetch_assoc(mysqli_stmt_get_result($uStmt));
+
+$userResult = mysqli_stmt_get_result($uStmt);
+$user = mysqli_fetch_assoc($userResult);
+
 mysqli_stmt_close($uStmt);
 
-/* Fetch assessments with counts */
+/* =====================================================
+   FETCH ASSESSMENTS WITH COUNTS
+===================================================== */
+
 $aStmt = mysqli_prepare($conn, "
     SELECT
         a.*,
-        (SELECT COUNT(*) FROM class_students cs
-            WHERE cs.class_id = a.class_id) AS assigned_count,
-        (SELECT COUNT(*) FROM submissions s
+
+        (
+            SELECT COUNT(*)
+            FROM class_students cs
+            WHERE cs.class_id = a.class_id
+        ) AS assigned_count,
+
+        (
+            SELECT COUNT(*)
+            FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.status IN ('submitted','done')) AS turned_in_count,
-        (SELECT COUNT(*) FROM submissions s
+            AND s.status IN ('submitted', 'done')
+        ) AS turned_in_count,
+
+        (
+            SELECT COUNT(*)
+            FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.grade IS NOT NULL) AS graded_count
+            AND s.grade IS NOT NULL
+        ) AS graded_count
+
     FROM assessments a
     WHERE a.class_id = ?
     ORDER BY a.type ASC, a.id DESC
 ");
 
+if (!$aStmt) {
+    die("Database error: Unable to prepare assessment query.");
+}
+
 mysqli_stmt_bind_param($aStmt, "i", $class_id);
 mysqli_stmt_execute($aStmt);
+
 $assessmentResult = mysqli_stmt_get_result($aStmt);
 
-/* Group assessments by type */
+/* =====================================================
+   GROUP ASSESSMENTS BY TYPE
+===================================================== */
+
 $grouped = [];
 
 while ($a = mysqli_fetch_assoc($assessmentResult)) {
@@ -63,27 +153,43 @@ while ($a = mysqli_fetch_assoc($assessmentResult)) {
 }
 
 mysqli_stmt_close($aStmt);
+
+/* Escape helper */
+function e($value) {
+    return htmlspecialchars(
+        (string)($value ?? ''),
+        ENT_QUOTES,
+        'UTF-8'
+    );
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Assessments – <?php echo htmlspecialchars($class['class_name']); ?></title>
+    <title>Assessments – <?php echo e($class['class_name']); ?></title>
 
     <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
 
     <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
 
     <!-- Existing teacher styles -->
     <link rel="stylesheet" href="teacher_class.css">
 
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
 
     <style>
         /* =====================================================
@@ -488,7 +594,7 @@ mysqli_stmt_close($aStmt);
         }
 
         /* =====================================================
-           ASSESSMENT MODAL - GENERAL
+           ASSESSMENT MODAL
         ===================================================== */
 
         .assessment-modal {
@@ -500,7 +606,6 @@ mysqli_stmt_close($aStmt);
             border-radius: 14px;
         }
 
-        /* Form must be flex so modal body can scroll */
         .assessment-modal form {
             display: flex;
             flex-direction: column;
@@ -560,7 +665,6 @@ mysqli_stmt_close($aStmt);
             flex: 1 1 0;
         }
 
-        /* Modal buttons */
         .cancel-btn,
         .save-btn {
             height: 52px;
@@ -588,12 +692,11 @@ mysqli_stmt_close($aStmt);
         }
 
         /* =====================================================
-           TABLET - 768px
+           TABLET
         ===================================================== */
 
         @media (max-width: 768px) {
 
-            /* Sidebar */
             .sidebar {
                 position: fixed !important;
                 top: 0;
@@ -652,7 +755,6 @@ mysqli_stmt_close($aStmt);
                 background: #f1f1f1;
             }
 
-            /* Sidebar overlay */
             .sidebar-overlay {
                 position: fixed;
                 inset: 0;
@@ -673,7 +775,6 @@ mysqli_stmt_close($aStmt);
                 overflow: hidden;
             }
 
-            /* Main content */
             .main-content,
             .main-content.expanded {
                 width: 100% !important;
@@ -681,7 +782,6 @@ mysqli_stmt_close($aStmt);
                 margin-left: 0 !important;
             }
 
-            /* Topbar */
             .topbar {
                 width: 100%;
                 max-width: 100%;
@@ -712,18 +812,15 @@ mysqli_stmt_close($aStmt);
                 flex-shrink: 0;
             }
 
-            /* Class navigation */
             .class-nav {
                 padding-left: 12px;
                 padding-right: 12px;
             }
 
-            /* Main content spacing */
             .container.py-4 {
                 padding: 20px 16px !important;
             }
 
-            /* Assessment cards */
             .assessment-item {
                 padding: 16px;
             }
@@ -748,7 +845,6 @@ mysqli_stmt_close($aStmt);
                 gap: 12px 18px;
             }
 
-            /* Modal tablet sizing */
             .assessment-modal .modal-header {
                 padding: 17px 20px 10px;
             }
@@ -773,12 +869,11 @@ mysqli_stmt_close($aStmt);
         }
 
         /* =====================================================
-           MOBILE - 576px
+           MOBILE
         ===================================================== */
 
         @media (max-width: 576px) {
 
-            /* Topbar */
             .topbar {
                 min-height: 58px;
                 padding: 0 12px;
@@ -807,7 +902,6 @@ mysqli_stmt_close($aStmt);
                 font-size: 19px;
             }
 
-            /* Class navigation */
             .class-nav {
                 padding-left: 10px;
                 padding-right: 10px;
@@ -818,7 +912,6 @@ mysqli_stmt_close($aStmt);
                 font-size: 13px;
             }
 
-            /* Main content */
             .container.py-4 {
                 padding: 16px 12px !important;
             }
@@ -839,7 +932,6 @@ mysqli_stmt_close($aStmt);
                 min-height: 44px;
             }
 
-            /* Topic */
             .topic-header-bar {
                 padding: 12px;
             }
@@ -863,7 +955,6 @@ mysqli_stmt_close($aStmt);
                 gap: 10px;
             }
 
-            /* Assessment cards */
             .assessment-item {
                 padding: 14px 12px;
                 border-radius: 8px;
@@ -894,7 +985,6 @@ mysqli_stmt_close($aStmt);
                 font-size: 12px;
             }
 
-            /* Assessment statistics */
             .assessment-stats-row {
                 display: grid;
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -923,7 +1013,6 @@ mysqli_stmt_close($aStmt);
                 font-size: 12px;
             }
 
-            /* Empty state */
             .assessment-empty {
                 padding: 35px 12px;
             }
@@ -937,9 +1026,7 @@ mysqli_stmt_close($aStmt);
                 line-height: 1.6;
             }
 
-            /* =================================================
-               FULL-SCREEN MOBILE MODAL
-            ================================================= */
+            /* Full-screen mobile modal */
 
             .assessment-modal {
                 width: 100%;
@@ -987,7 +1074,6 @@ mysqli_stmt_close($aStmt);
                 flex: none;
             }
 
-            /* Modal form controls */
             .assessment-modal .form-control,
             .assessment-modal .form-select {
                 width: 100%;
@@ -1011,7 +1097,6 @@ mysqli_stmt_close($aStmt);
                 max-width: 100%;
             }
 
-            /* Date and time fields */
             .assessment-modal .d-flex.gap-2 {
                 display: flex !important;
                 flex-direction: column;
@@ -1024,7 +1109,6 @@ mysqli_stmt_close($aStmt);
                 flex: none;
             }
 
-            /* Instructions */
             .instruction-box {
                 padding: 12px;
             }
@@ -1039,7 +1123,6 @@ mysqli_stmt_close($aStmt);
                 gap: 10px;
             }
 
-            /* Attachment controls */
             .attachment-icons {
                 gap: 5px;
             }
@@ -1093,7 +1176,7 @@ mysqli_stmt_close($aStmt);
         }
 
         /* =====================================================
-           EXTRA SMALL PHONES - 360px
+           EXTRA SMALL PHONES
         ===================================================== */
 
         @media (max-width: 360px) {
@@ -1171,6 +1254,7 @@ mysqli_stmt_close($aStmt);
             }
         }
     </style>
+
 </head>
 
 <body>
@@ -1187,9 +1271,11 @@ mysqli_stmt_close($aStmt);
             <i class="fa-solid fa-bars"></i>
         </button>
 
-        <button class="sidebar-close-btn"
-                onclick="closeMobileSidebar()"
-                aria-label="Close menu">
+        <button
+            class="sidebar-close-btn"
+            onclick="closeMobileSidebar()"
+            aria-label="Close menu"
+        >
             <i class="fa-solid fa-xmark"></i>
         </button>
 
@@ -1243,13 +1329,6 @@ mysqli_stmt_close($aStmt);
                 </a>
             </li>
 
-            <li>
-                <a href="teacher_resources.php">
-                    <i class="fa-solid fa-book-open"></i>
-                    <span>Resources</span>
-                </a>
-            </li>
-
         <?php endif; ?>
 
     </ul>
@@ -1263,11 +1342,11 @@ mysqli_stmt_close($aStmt);
 
 </div>
 
-<!-- Sidebar overlay -->
-<div class="sidebar-overlay"
-     id="sidebarOverlay"
-     onclick="closeMobileSidebar()">
-</div>
+<div
+    class="sidebar-overlay"
+    id="sidebarOverlay"
+    onclick="closeMobileSidebar()"
+></div>
 
 <!-- =====================================================
      MAIN CONTENT
@@ -1276,6 +1355,7 @@ mysqli_stmt_close($aStmt);
 <div class="main-content" id="mainContent">
 
     <!-- TOPBAR -->
+
     <div class="topbar">
 
         <div class="navbar-left">
@@ -1284,9 +1364,11 @@ mysqli_stmt_close($aStmt);
                 <i class="fa-solid fa-bars"></i>
             </button>
 
-            <img src="img/classroom logo.png"
-                 class="navbar-logo"
-                 alt="Logo">
+            <img
+                src="img/classroom logo.png"
+                class="navbar-logo"
+                alt="Logo"
+            >
 
         </div>
 
@@ -1300,16 +1382,20 @@ mysqli_stmt_close($aStmt);
                         strtolower($profileFile),
                         ['default.png', 'default.jpg', 'default.jpeg', 'null']
                     )
-                    && file_exists(__DIR__ . '/uploads/' . basename($profileFile));
+                    && file_exists(
+                        __DIR__ . '/uploads/' . basename($profileFile)
+                    );
             ?>
 
             <a href="profile.php" class="profile-icon">
 
                 <?php if ($hasProfileImage): ?>
 
-                    <img src="uploads/<?php echo htmlspecialchars(basename($profileFile)); ?>"
-                         alt="Profile"
-                         onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend','<i class=&quot;fa-solid fa-user&quot;></i>');">
+                    <img
+                        src="uploads/<?php echo e(basename($profileFile)); ?>"
+                        alt="Profile"
+                        onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend','<i class=&quot;fa-solid fa-user&quot;></i>');"
+                    >
 
                 <?php else: ?>
 
@@ -1324,6 +1410,7 @@ mysqli_stmt_close($aStmt);
     </div>
 
     <!-- CLASS NAVIGATION -->
+
     <div class="class-nav">
 
         <?php if ($isChair): ?>
@@ -1332,8 +1419,10 @@ mysqli_stmt_close($aStmt);
                 Stream
             </a>
 
-            <a href="teacher_assessment.php?id=<?php echo $class_id; ?>"
-               class="nav-active">
+            <a
+                href="teacher_assessment.php?id=<?php echo $class_id; ?>"
+                class="nav-active"
+            >
                 Assessments
             </a>
 
@@ -1351,8 +1440,10 @@ mysqli_stmt_close($aStmt);
                 Stream
             </a>
 
-            <a href="teacher_assessment.php?id=<?php echo $class_id; ?>"
-               class="nav-active">
+            <a
+                href="teacher_assessment.php?id=<?php echo $class_id; ?>"
+                class="nav-active"
+            >
                 Assessments
             </a>
 
@@ -1378,21 +1469,18 @@ mysqli_stmt_close($aStmt);
 
     <div class="container py-4">
 
-        <!-- ACTIONS -->
         <div class="assessment-actions">
 
-            <button class="create-btn"
-                    data-bs-toggle="modal"
-                    data-bs-target="#assessmentModal">
-
+            <button
+                class="create-btn"
+                data-bs-toggle="modal"
+                data-bs-target="#assessmentModal"
+            >
                 <i class="fa-solid fa-plus"></i>
                 Create
-
             </button>
 
         </div>
-
-        <!-- ASSESSMENT GROUPS -->
 
         <?php if (empty($grouped)): ?>
 
@@ -1411,59 +1499,60 @@ mysqli_stmt_close($aStmt);
 
             <?php foreach ($grouped as $type => $assessments): ?>
 
-                <div class="topic-block mb-3"
-                     id="group-<?php echo htmlspecialchars($type); ?>">
+                <div
+                    class="topic-block mb-3"
+                    id="group-<?php echo e($type); ?>"
+                >
 
-                    <!-- TOPIC HEADER -->
                     <div class="topic-header-bar">
 
                         <div class="topic-header-left">
 
-                            <button class="topic-collapse-btn"
-                                    onclick="toggleGroup('body-<?php echo htmlspecialchars($type); ?>', this)">
-
+                            <button
+                                class="topic-collapse-btn"
+                                onclick="toggleGroup('body-<?php echo e($type); ?>', this)"
+                            >
                                 <i class="fa-solid fa-chevron-down"></i>
-
                             </button>
 
                             <span class="topic-name">
-                                <?php echo htmlspecialchars($type); ?>
+                                <?php echo e($type); ?>
                             </span>
 
                         </div>
 
                         <div class="dropdown">
 
-                            <button class="topic-option-btn"
-                                    type="button"
-                                    data-bs-toggle="dropdown"
-                                    aria-expanded="false">
-
+                            <button
+                                class="topic-option-btn"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                            >
                                 <i class="fa-solid fa-ellipsis-vertical"></i>
-
                             </button>
 
                             <ul class="dropdown-menu dropdown-menu-end">
 
                                 <li>
-                                    <a class="dropdown-item"
-                                       href="#"
-                                       onclick="event.preventDefault(); filterByType('<?php echo htmlspecialchars(addslashes($type)); ?>')">
-
+                                    <a
+                                        class="dropdown-item"
+                                        href="#"
+                                        onclick="event.preventDefault(); filterByType(<?php echo htmlspecialchars(json_encode($type), ENT_QUOTES, 'UTF-8'); ?>)"
+                                    >
                                         <i class="fa-solid fa-filter me-2"></i>
                                         Show only this type
-
                                     </a>
                                 </li>
 
                                 <li>
-                                    <a class="dropdown-item"
-                                       href="#"
-                                       onclick="event.preventDefault(); showAllGroups()">
-
+                                    <a
+                                        class="dropdown-item"
+                                        href="#"
+                                        onclick="event.preventDefault(); showAllGroups()"
+                                    >
                                         <i class="fa-solid fa-list me-2"></i>
                                         Show all types
-
                                     </a>
                                 </li>
 
@@ -1473,9 +1562,10 @@ mysqli_stmt_close($aStmt);
 
                     </div>
 
-                    <!-- ASSESSMENT ROWS -->
-                    <div class="topic-body"
-                         id="body-<?php echo htmlspecialchars($type); ?>">
+                    <div
+                        class="topic-body"
+                        id="body-<?php echo e($type); ?>"
+                    >
 
                         <?php foreach ($assessments as $assessment): ?>
 
@@ -1487,11 +1577,11 @@ mysqli_stmt_close($aStmt);
 
                                         <i class="fa-regular fa-clipboard assessment-icon"></i>
 
-                                        <a href="teacher_submissions.php?id=<?php echo (int)$assessment['id']; ?>"
-                                           class="assessment-title-link">
-
-                                            <?php echo htmlspecialchars($assessment['title']); ?>
-
+                                        <a
+                                            href="teacher_submissions.php?id=<?php echo (int)$assessment['id']; ?>"
+                                            class="assessment-title-link"
+                                        >
+                                            <?php echo e($assessment['title']); ?>
                                         </a>
 
                                     </div>
@@ -1505,33 +1595,36 @@ mysqli_stmt_close($aStmt);
                                         <span class="due-date">
 
                                             <?php
-                                                echo !empty($assessment['due_date'])
-                                                    ? date("M d, Y", strtotime($assessment['due_date']))
-                                                    : 'No due date';
+                                            echo !empty($assessment['due_date'])
+                                                ? date(
+                                                    "M d, Y",
+                                                    strtotime($assessment['due_date'])
+                                                )
+                                                : 'No due date';
                                             ?>
 
                                         </span>
 
                                         <div class="dropdown">
 
-                                            <button class="option-btn"
-                                                    type="button"
-                                                    data-bs-toggle="dropdown"
-                                                    aria-expanded="false">
-
+                                            <button
+                                                class="option-btn"
+                                                type="button"
+                                                data-bs-toggle="dropdown"
+                                                aria-expanded="false"
+                                            >
                                                 <i class="fa-solid fa-ellipsis-vertical"></i>
-
                                             </button>
 
                                             <ul class="dropdown-menu dropdown-menu-end">
 
                                                 <li>
-                                                    <a class="dropdown-item"
-                                                       href="edit_assessment.php?id=<?php echo (int)$assessment['id']; ?>&class_id=<?php echo $class_id; ?>">
-
+                                                    <a
+                                                        class="dropdown-item"
+                                                        href="edit_assessment.php?id=<?php echo (int)$assessment['id']; ?>&class_id=<?php echo $class_id; ?>"
+                                                    >
                                                         <i class="fa-solid fa-pen-to-square me-2"></i>
                                                         Edit
-
                                                     </a>
                                                 </li>
 
@@ -1540,13 +1633,13 @@ mysqli_stmt_close($aStmt);
                                                 </li>
 
                                                 <li>
-                                                    <a class="dropdown-item text-danger delete-assessment-btn"
-                                                       href="#"
-                                                       data-id="<?php echo (int)$assessment['id']; ?>">
-
+                                                    <a
+                                                        class="dropdown-item text-danger delete-assessment-btn"
+                                                        href="#"
+                                                        data-id="<?php echo (int)$assessment['id']; ?>"
+                                                    >
                                                         <i class="fa-solid fa-trash me-2"></i>
                                                         Delete
-
                                                     </a>
                                                 </li>
 
@@ -1558,7 +1651,6 @@ mysqli_stmt_close($aStmt);
 
                                 </div>
 
-                                <!-- ASSESSMENT STATISTICS -->
                                 <div class="assessment-stats-row">
 
                                     <div class="posted-label">
@@ -1617,184 +1709,196 @@ mysqli_stmt_close($aStmt);
      CREATE ASSESSMENT MODAL
 ===================================================== -->
 
-<div class="modal fade"
-     id="assessmentModal"
-     tabindex="-1"
-     aria-labelledby="assessmentModalLabel"
-     aria-hidden="true">
+<div
+    class="modal fade"
+    id="assessmentModal"
+    tabindex="-1"
+    aria-labelledby="assessmentModalLabel"
+    aria-hidden="true"
+>
 
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
 
         <div class="modal-content assessment-modal">
 
-            <!-- MODAL HEADER -->
             <div class="modal-header border-0 pb-0">
 
-                <h4 class="modal-title fw-bold"
-                    id="assessmentModalLabel">
-
+                <h4
+                    class="modal-title fw-bold"
+                    id="assessmentModalLabel"
+                >
                     Create New Assessment
-
                 </h4>
 
-                <button type="button"
-                        class="btn-close"
-                        data-bs-dismiss="modal"
-                        aria-label="Close">
-                </button>
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"
+                ></button>
 
             </div>
 
-            <!-- FORM -->
-            <form action="save_assessment.php"
-                  method="POST"
-                  enctype="multipart/form-data"
-                  id="assessmentForm">
+            <form
+                action="save_assessment.php"
+                method="POST"
+                enctype="multipart/form-data"
+                id="assessmentForm"
+            >
 
-                <input type="hidden"
-                       name="class_id"
-                       value="<?php echo $class_id; ?>">
+                <input
+                    type="hidden"
+                    name="class_id"
+                    value="<?php echo $class_id; ?>"
+                >
 
-                <!-- MODAL BODY -->
                 <div class="modal-body pt-3">
 
-                    <!-- TOPIC -->
                     <div class="mb-3">
 
-                        <input type="text"
-                               name="topic"
-                               class="form-control assessment-input"
-                               placeholder="Topic">
+                        <input
+                            type="text"
+                            name="topic"
+                            class="form-control assessment-input"
+                            placeholder="Topic"
+                        >
 
                     </div>
 
-                    <!-- TITLE -->
                     <div class="mb-3">
 
-                        <input type="text"
-                               name="title"
-                               class="form-control assessment-input"
-                               placeholder="Title*"
-                               required>
+                        <input
+                            type="text"
+                            name="title"
+                            class="form-control assessment-input"
+                            placeholder="Title*"
+                            required
+                        >
 
                     </div>
 
-                    <!-- INSTRUCTIONS AND ATTACHMENTS -->
                     <div class="instruction-box mb-3">
 
-                        <textarea name="instructions"
-                                  class="form-control"
-                                  placeholder="Instructions (optional)"></textarea>
+                        <textarea
+                            name="instructions"
+                            class="form-control"
+                            placeholder="Instructions (optional)"
+                        ></textarea>
 
-                        <!-- ATTACHMENT LIST -->
                         <div id="attachList" class="attach-list"></div>
 
-                        <!-- LINK INPUT -->
-                        <div id="linkRow"
-                             class="link-add-row"
-                             hidden>
+                        <div
+                            id="linkRow"
+                            class="link-add-row"
+                            hidden
+                        >
 
                             <i class="fa-solid fa-link"></i>
 
-                            <input type="url"
-                                   id="linkInput"
-                                   placeholder="Paste a link, then press Enter or Add">
+                            <input
+                                type="url"
+                                id="linkInput"
+                                placeholder="Paste a link, then press Enter or Add"
+                            >
 
-                            <button type="button"
-                                    id="linkAddBtn"
-                                    class="link-add-btn">
-
+                            <button
+                                type="button"
+                                id="linkAddBtn"
+                                class="link-add-btn"
+                            >
                                 Add
-
                             </button>
 
                         </div>
 
-                        <!-- ATTACHMENT MESSAGE -->
                         <div id="attachMsg" class="attach-msg"></div>
 
-                        <!-- INSTRUCTION FOOTER -->
                         <div class="instruction-footer">
 
                             <div class="attachment-icons">
 
-                                <button type="button"
-                                        class="icon-btn"
-                                        id="pickImageBtn"
-                                        title="Attach images">
-
+                                <button
+                                    type="button"
+                                    class="icon-btn"
+                                    id="pickImageBtn"
+                                    title="Attach images"
+                                >
                                     <i class="fa-regular fa-image"></i>
-
                                 </button>
 
-                                <button type="button"
-                                        class="icon-btn"
-                                        id="pickFileBtn"
-                                        title="Attach files">
-
+                                <button
+                                    type="button"
+                                    class="icon-btn"
+                                    id="pickFileBtn"
+                                    title="Attach files"
+                                >
                                     <i class="fa-solid fa-arrow-up-from-bracket"></i>
-
                                 </button>
 
-                                <button type="button"
-                                        class="icon-btn"
-                                        id="pickLinkBtn"
-                                        title="Attach link">
-
+                                <button
+                                    type="button"
+                                    class="icon-btn"
+                                    id="pickLinkBtn"
+                                    title="Attach link"
+                                >
                                     <i class="fa-solid fa-link"></i>
-
                                 </button>
 
-                                <span id="attachCounter"
-                                      class="attach-counter">
-
+                                <span
+                                    id="attachCounter"
+                                    class="attach-counter"
+                                >
                                     0/10
-
                                 </span>
 
                             </div>
 
-                            <button type="submit"
-                                    class="send-icon"
-                                    title="Post">
-
+                            <button
+                                type="submit"
+                                class="send-icon"
+                                title="Post"
+                            >
                                 <i class="fa-regular fa-paper-plane"></i>
-
                             </button>
 
                         </div>
 
-                        <!-- FILE PICKERS -->
-                        <input type="file"
-                               id="imagePicker"
-                               accept="image/*"
-                               multiple
-                               hidden>
+                        <input
+                            type="file"
+                            id="imagePicker"
+                            accept="image/*"
+                            multiple
+                            hidden
+                        >
 
-                        <input type="file"
-                               id="filePicker"
-                               accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
-                               multiple
-                               hidden>
+                        <input
+                            type="file"
+                            id="filePicker"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
+                            multiple
+                            hidden
+                        >
 
-                        <!-- SUBMITTED FILE HOLDERS -->
-                        <input type="file"
-                               name="images[]"
-                               id="imagesHolder"
-                               multiple
-                               hidden>
+                        <input
+                            type="file"
+                            name="images[]"
+                            id="imagesHolder"
+                            multiple
+                            hidden
+                        >
 
-                        <input type="file"
-                               name="attachments[]"
-                               id="filesHolder"
-                               multiple
-                               hidden>
+                        <input
+                            type="file"
+                            name="attachments[]"
+                            id="filesHolder"
+                            multiple
+                            hidden
+                        >
 
                         <div id="linkHolders"></div>
 
                     </div>
 
-                    <!-- TYPE / POINTS / ASSIGN TO -->
                     <div class="row g-3 mb-3">
 
                         <div class="col-md-4">
@@ -1803,14 +1907,14 @@ mysqli_stmt_close($aStmt);
                                 Type
                             </label>
 
-                            <select class="form-select assessment-select"
-                                    name="type">
-
+                            <select
+                                class="form-select assessment-select"
+                                name="type"
+                            >
                                 <option>Quiz</option>
                                 <option>Assignment</option>
                                 <option>Activity</option>
                                 <option>Exam</option>
-
                             </select>
 
                         </div>
@@ -1821,15 +1925,15 @@ mysqli_stmt_close($aStmt);
                                 Points
                             </label>
 
-                            <select class="form-select assessment-select"
-                                    name="points">
-
+                            <select
+                                class="form-select assessment-select"
+                                name="points"
+                            >
                                 <option value="100">100</option>
                                 <option value="50">50</option>
                                 <option value="25">25</option>
                                 <option value="10">10</option>
                                 <option value="custom">Custom</option>
-
                             </select>
 
                         </div>
@@ -1846,11 +1950,11 @@ mysqli_stmt_close($aStmt);
                                     <i class="fa-solid fa-gear text-secondary"></i>
                                 </span>
 
-                                <select class="form-select assessment-select border-start-0"
-                                        style="border-left:none;">
-
+                                <select
+                                    class="form-select assessment-select border-start-0"
+                                    style="border-left:none;"
+                                >
                                     <option>All Students</option>
-
                                 </select>
 
                             </div>
@@ -1859,24 +1963,26 @@ mysqli_stmt_close($aStmt);
 
                     </div>
 
-                    <!-- CUSTOM POINTS -->
-                    <div id="customPointsBox"
-                         class="mb-3"
-                         style="display:none;">
+                    <div
+                        id="customPointsBox"
+                        class="mb-3"
+                        style="display:none;"
+                    >
 
                         <label class="form-label fw-bold">
                             Custom Points
                         </label>
 
-                        <input type="number"
-                               name="custom_points"
-                               class="form-control assessment-input"
-                               placeholder="Enter points"
-                               min="0">
+                        <input
+                            type="number"
+                            name="custom_points"
+                            class="form-control assessment-input"
+                            placeholder="Enter points"
+                            min="0"
+                        >
 
                     </div>
 
-                    <!-- START DATE AND END DATE -->
                     <div class="row g-3">
 
                         <div class="col-md-6">
@@ -1887,13 +1993,17 @@ mysqli_stmt_close($aStmt);
 
                             <div class="d-flex gap-2 mt-1">
 
-                                <input type="date"
-                                       class="form-control"
-                                       name="start_date">
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    name="start_date"
+                                >
 
-                                <input type="time"
-                                       class="form-control"
-                                       name="start_time">
+                                <input
+                                    type="time"
+                                    class="form-control"
+                                    name="start_time"
+                                >
 
                             </div>
 
@@ -1907,14 +2017,18 @@ mysqli_stmt_close($aStmt);
 
                             <div class="d-flex gap-2 mt-1">
 
-                                <input type="date"
-                                       class="form-control"
-                                       name="due_date"
-                                       required>
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    name="due_date"
+                                    required
+                                >
 
-                                <input type="time"
-                                       class="form-control"
-                                       name="due_time">
+                                <input
+                                    type="time"
+                                    class="form-control"
+                                    name="due_time"
+                                >
 
                             </div>
 
@@ -1924,22 +2038,21 @@ mysqli_stmt_close($aStmt);
 
                 </div>
 
-                <!-- MODAL FOOTER -->
                 <div class="modal-footer border-0 pt-2">
 
-                    <button type="button"
-                            class="btn btn-outline-dark cancel-btn"
-                            data-bs-dismiss="modal">
-
+                    <button
+                        type="button"
+                        class="btn btn-outline-dark cancel-btn"
+                        data-bs-dismiss="modal"
+                    >
                         Cancel
-
                     </button>
 
-                    <button type="submit"
-                            class="btn save-btn">
-
+                    <button
+                        type="submit"
+                        class="btn save-btn"
+                    >
                         Save
-
                     </button>
 
                 </div>
@@ -1990,35 +2103,24 @@ function closeMobileSidebar() {
     document.body.classList.remove('no-scroll');
 }
 
-/* Close sidebar after selecting a link */
 document.querySelectorAll('.sidebar ul a, .logout-btn a').forEach(link => {
-
     link.addEventListener('click', function() {
-
         if (window.innerWidth <= 768) {
             closeMobileSidebar();
         }
-
     });
-
 });
 
-/* Close sidebar using Escape */
 document.addEventListener('keydown', function(e) {
-
     if (e.key === 'Escape') {
         closeMobileSidebar();
     }
-
 });
 
-/* Reset mobile sidebar on desktop resize */
 window.addEventListener('resize', function() {
-
     if (window.innerWidth > 768) {
         closeMobileSidebar();
     }
-
 });
 
 /* =========================================================
@@ -2026,7 +2128,6 @@ window.addEventListener('resize', function() {
 ========================================================= */
 
 function toggleGroup(bodyId, btn) {
-
     var body = document.getElementById(bodyId);
     var icon = btn.querySelector('i');
 
@@ -2034,7 +2135,6 @@ function toggleGroup(bodyId, btn) {
 
     icon.classList.toggle('fa-chevron-down');
     icon.classList.toggle('fa-chevron-right');
-
 }
 
 /* =========================================================
@@ -2042,24 +2142,16 @@ function toggleGroup(bodyId, btn) {
 ========================================================= */
 
 function filterByType(type) {
-
     document.querySelectorAll('.topic-block').forEach(function(block) {
-
         block.style.display =
             block.id === 'group-' + type ? 'block' : 'none';
-
     });
-
 }
 
 function showAllGroups() {
-
     document.querySelectorAll('.topic-block').forEach(function(block) {
-
         block.style.display = 'block';
-
     });
-
 }
 
 /* =========================================================
@@ -2077,18 +2169,15 @@ document.addEventListener('DOMContentLoaded', function() {
             var id = this.dataset.id;
 
             if (confirm('Are you sure you want to delete this assessment? This cannot be undone.')) {
-
                 window.location.href =
                     'delete_assessment.php?id=' + id +
                     '&class_id=' + CLASS_ID;
-
             }
 
         });
 
     });
 
-    /* Custom points */
     var pointsSelect = document.querySelector('select[name="points"]');
 
     if (pointsSelect) {
@@ -2134,13 +2223,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showMsg(message) {
-
         var msg = $('attachMsg');
 
         if (msg) {
             msg.textContent = message || '';
         }
-
     }
 
     /* =====================================================
@@ -2190,10 +2277,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (canSetFiles) {
-
             imagesHolder.files = dtI.files;
             filesHolder.files = dtF.files;
-
         }
 
         counter.textContent = items.length + '/' + MAX;
@@ -2202,7 +2287,6 @@ document.addEventListener('DOMContentLoaded', function() {
             'full',
             items.length >= MAX
         );
-
     }
 
     /* =====================================================
@@ -2252,7 +2336,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             chip.appendChild(name);
 
-            /* Remove attachment */
             var x = document.createElement('button');
 
             x.type = 'button';
@@ -2281,7 +2364,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         sync();
-
     }
 
     /* =====================================================
@@ -2295,29 +2377,20 @@ document.addEventListener('DOMContentLoaded', function() {
         Array.prototype.forEach.call(fileList, function(f) {
 
             if (items.length >= MAX) {
-
                 showMsg('You can attach up to ' + MAX + ' items only.');
-
                 return;
-
             }
 
             if (f.size > MAX_MB * 1024 * 1024) {
-
                 showMsg(
                     '"' + f.name + '" is larger than ' + MAX_MB + ' MB.'
                 );
-
                 return;
-
             }
 
             if (type === 'image' && f.type.indexOf('image/') !== 0) {
-
                 showMsg('"' + f.name + '" is not an image.');
-
                 return;
-
             }
 
             if (type === 'file') {
@@ -2325,25 +2398,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 var ext = f.name.split('.').pop().toLowerCase();
 
                 if (FILE_EXT.indexOf(ext) === -1) {
-
                     showMsg(
                         '"' + f.name + '" is not a supported file type.'
                     );
-
                     return;
-
                 }
 
             }
 
-            /* Prevent duplicate files */
             var dup = items.some(function(it) {
-
                 return it.file &&
                     it.type === type &&
                     it.file.name === f.name &&
                     it.file.size === f.size;
-
             });
 
             if (dup) {
@@ -2351,21 +2418,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             items.push({
-
                 type: type,
-
                 file: f,
-
                 preview: type === 'image'
                     ? URL.createObjectURL(f)
                     : null
-
             });
 
         });
 
         render();
-
     }
 
     /* =====================================================
@@ -2387,42 +2449,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-
             new URL(v);
-
         } catch (e) {
-
             showMsg("That doesn't look like a valid link.");
-
             return;
-
         }
 
         if (items.length >= MAX) {
-
             showMsg('You can attach up to ' + MAX + ' items only.');
-
             return;
-
         }
 
         if (items.some(function(it) {
-
             return it.type === 'link' && it.url === v;
-
         })) {
-
             showMsg('That link is already added.');
-
             return;
-
         }
 
         items.push({
-
             type: 'link',
             url: v
-
         });
 
         linkInput.value = '';
@@ -2430,7 +2477,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showMsg('');
 
         render();
-
     }
 
     /* =====================================================
@@ -2442,21 +2488,14 @@ document.addEventListener('DOMContentLoaded', function() {
         var linkRow = $('linkRow');
         var linkInput = $('linkInput');
 
-        /* Image picker */
         $('pickImageBtn').addEventListener('click', function() {
-
             $('imagePicker').click();
-
         });
 
-        /* File picker */
         $('pickFileBtn').addEventListener('click', function() {
-
             $('filePicker').click();
-
         });
 
-        /* Link picker */
         $('pickLinkBtn').addEventListener('click', function() {
 
             linkRow.hidden = !linkRow.hidden;
@@ -2467,41 +2506,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         });
 
-        /* Image selection */
         $('imagePicker').addEventListener('change', function() {
-
             addFiles(this.files, 'image');
-
             this.value = '';
-
         });
 
-        /* File selection */
         $('filePicker').addEventListener('change', function() {
-
             addFiles(this.files, 'file');
-
             this.value = '';
-
         });
 
-        /* Add link button */
         $('linkAddBtn').addEventListener('click', addLink);
 
-        /* Add link using Enter */
         linkInput.addEventListener('keydown', function(e) {
 
             if (e.key === 'Enter') {
-
                 e.preventDefault();
-
                 addLink();
-
             }
 
         });
 
-        /* Before submitting form */
         $('assessmentForm').addEventListener('submit', function() {
 
             if (linkInput.value.trim() !== '') {
@@ -2512,23 +2537,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
         });
 
-        /* Reset modal after closing */
         $('assessmentModal').addEventListener(
             'hidden.bs.modal',
             function() {
 
                 items.forEach(function(it) {
-
                     if (it.preview) {
                         URL.revokeObjectURL(it.preview);
                     }
-
                 });
 
                 items = [];
 
                 linkRow.hidden = true;
-
                 linkInput.value = '';
 
                 showMsg('');

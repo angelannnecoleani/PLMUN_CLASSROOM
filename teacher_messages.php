@@ -1,58 +1,269 @@
+
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
+require_once 'auth_helpers.php';
 
-if (!isset($_SESSION['user_id'])) {
+/* ==========================================
+   LOGIN AND ROLE VALIDATION
+========================================== */
+
+if (empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-$teacher_id = (int)$_SESSION['user_id'];
+$teacher_id = (int) $_SESSION['user_id'];
+$role = $_SESSION['role'] ?? '';
 
-$userQuery = mysqli_query($conn, "SELECT * FROM users WHERE id='$teacher_id'");
-$user = mysqli_fetch_assoc($userQuery);
+if (!in_array($role, ['teacher', 'program_chair'], true)) {
+    header("Location: login.php");
+    exit();
+}
 
-// Get all classes this teacher owns (+ last message / attachment type for the preview)
-// CHANGED: deleted messages are ignored in the preview
-$classesQuery = mysqli_query($conn, "
-    SELECT classes.*,
-           (SELECT message FROM class_chat_messages
-            WHERE class_chat_messages.class_id = classes.id
-              AND class_chat_messages.is_deleted = 0
-            ORDER BY id DESC LIMIT 1) AS last_message,
-           (SELECT attachment_type FROM class_chat_messages
-            WHERE class_chat_messages.class_id = classes.id
-              AND class_chat_messages.is_deleted = 0
-            ORDER BY id DESC LIMIT 1) AS last_attachment_type,
-           (SELECT created_at FROM class_chat_messages
-            WHERE class_chat_messages.class_id = classes.id
-              AND class_chat_messages.is_deleted = 0
-            ORDER BY id DESC LIMIT 1) AS last_message_time
-    FROM classes
-    WHERE teacher_id = '$teacher_id'
-    ORDER BY last_message_time DESC, classes.id DESC
-");
+/* ==========================================
+   FETCH LOGGED-IN USER
+========================================== */
 
-$active_class_id = isset($_GET['class_id']) ? intval($_GET['class_id']) : 0;
+$userStmt = mysqli_prepare(
+    $conn,
+    "SELECT id, name, profile_image, role
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+);
+
+if (!$userStmt) {
+    die("Database error: " . htmlspecialchars(mysqli_error($conn)));
+}
+
+mysqli_stmt_bind_param($userStmt, "i", $teacher_id);
+mysqli_stmt_execute($userStmt);
+
+$userResult = mysqli_stmt_get_result($userStmt);
+$user = mysqli_fetch_assoc($userResult);
+
+mysqli_stmt_close($userStmt);
+
+if (!$user || $user['role'] !== $role) {
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
+/* ==========================================
+   GET ALL ACCESSIBLE CLASSES
+   PRIMARY INSTRUCTOR + CO-INSTRUCTOR
+========================================== */
+
+if ($role === 'teacher') {
+
+    $classesStmt = mysqli_prepare(
+        $conn,
+        "SELECT
+            c.*,
+
+            (
+                SELECT cm.message
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_message,
+
+            (
+                SELECT cm.attachment_type
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_attachment_type,
+
+            (
+                SELECT cm.created_at
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_message_time
+
+         FROM classes c
+
+         WHERE
+            c.teacher_id = ?
+            OR EXISTS (
+                SELECT 1
+                FROM class_instructors ci
+                WHERE ci.class_id = c.id
+                  AND ci.teacher_id = ?
+            )
+
+         ORDER BY
+            last_message_time DESC,
+            c.id DESC"
+    );
+
+    if (!$classesStmt) {
+        die("Class query error: " . htmlspecialchars(mysqli_error($conn)));
+    }
+
+    mysqli_stmt_bind_param(
+        $classesStmt,
+        "ii",
+        $teacher_id,
+        $teacher_id
+    );
+
+} else {
+
+    // Program chairs can access classes allowed by the existing helper.
+    $classesStmt = mysqli_prepare(
+        $conn,
+        "SELECT
+            c.*,
+
+            (
+                SELECT cm.message
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_message,
+
+            (
+                SELECT cm.attachment_type
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_attachment_type,
+
+            (
+                SELECT cm.created_at
+                FROM class_chat_messages cm
+                WHERE cm.class_id = c.id
+                  AND cm.is_deleted = 0
+                ORDER BY cm.id DESC
+                LIMIT 1
+            ) AS last_message_time
+
+         FROM classes c
+
+         WHERE c.program = (
+             SELECT u.program
+             FROM users u
+             WHERE u.id = ?
+             LIMIT 1
+         )
+
+         ORDER BY
+            last_message_time DESC,
+            c.id DESC"
+    );
+
+    if (!$classesStmt) {
+        die("Class query error: " . htmlspecialchars(mysqli_error($conn)));
+    }
+
+    mysqli_stmt_bind_param(
+        $classesStmt,
+        "i",
+        $teacher_id
+    );
+}
+
+mysqli_stmt_execute($classesStmt);
+
+$classesQuery = mysqli_stmt_get_result($classesStmt);
+
+/* ==========================================
+   GET ACTIVE CLASS
+========================================== */
+
+$active_class_id = isset($_GET['class_id'])
+    ? (int) $_GET['class_id']
+    : 0;
 
 if (!$active_class_id && mysqli_num_rows($classesQuery) > 0) {
-    mysqli_data_seek($classesQuery, 0);
     $first = mysqli_fetch_assoc($classesQuery);
-    $active_class_id = $first['id'];
+    $active_class_id = (int) $first['id'];
+
     mysqli_data_seek($classesQuery, 0);
 }
+
+/* ==========================================
+   VERIFY ACTIVE CLASS ACCESS
+========================================== */
 
 $activeClass = null;
-if ($active_class_id) {
-    $r = mysqli_query($conn, "SELECT * FROM classes WHERE id='$active_class_id' AND teacher_id='$teacher_id'");
-    $activeClass = mysqli_fetch_assoc($r);
+
+if ($active_class_id > 0) {
+
+    if ($role === 'teacher') {
+
+        $activeStmt = mysqli_prepare(
+            $conn,
+            "SELECT c.*
+             FROM classes c
+             WHERE c.id = ?
+               AND (
+                    c.teacher_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM class_instructors ci
+                        WHERE ci.class_id = c.id
+                          AND ci.teacher_id = ?
+                    )
+               )
+             LIMIT 1"
+        );
+
+        if (!$activeStmt) {
+            die("Active class query error: " .
+                htmlspecialchars(mysqli_error($conn)));
+        }
+
+        mysqli_stmt_bind_param(
+            $activeStmt,
+            "iii",
+            $active_class_id,
+            $teacher_id,
+            $teacher_id
+        );
+
+        mysqli_stmt_execute($activeStmt);
+
+        $activeResult = mysqli_stmt_get_result($activeStmt);
+        $activeClass = mysqli_fetch_assoc($activeResult);
+
+        mysqli_stmt_close($activeStmt);
+
+    } else {
+
+        $activeClass = getClassAccess(
+            $conn,
+            $active_class_id,
+            $teacher_id,
+            $role
+        );
+    }
 }
 
-/* MOBILE: only open the chat panel straight away when the teacher
-   actually picked a class (?class_id=...). With no class_id in the URL
-   the phone shows the class list first. */
-$openChatOnMobile = isset($_GET['class_id']) && $activeClass;
+/* ==========================================
+   MOBILE CHAT DISPLAY
+========================================== */
+
+$openChatOnMobile = (
+    isset($_GET['class_id']) &&
+    $activeClass
+);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,7 +294,7 @@ $openChatOnMobile = isset($_GET['class_id']) && $activeClass;
         <li><a href="teacher_to_review.php"><i class="fa-solid fa-clipboard-list"></i><span>To Review</span></a></li>
         <li><a href="teacher_messages.php" class="active"><i class="fa-regular fa-message"></i><span>Messages</span></a></li>
         <li><a href="teacher_performance.php"><i class="fa-solid fa-chart-pie"></i><span>Performance</span></a></li>
-        <li><a href="teacher_resources.php"><i class="fa-solid fa-book-open"></i><span>Resources</span></a></li>
+        
     </ul>
     <div class="logout-btn">
         <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>

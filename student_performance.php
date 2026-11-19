@@ -702,7 +702,7 @@ $classesQuery = mysqli_stmt_get_result($classesStmt);
         </li>
 
         <li>
-            <a href="student_classpage.php">
+            <a href="student_class_page.php">
                 <i class="fa-solid fa-users"></i>
                 <span>Classes</span>
             </a>

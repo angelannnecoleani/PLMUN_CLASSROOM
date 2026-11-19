@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 require_once 'database.php';
@@ -7,15 +6,7 @@ require_once 'database.php';
    LOGIN VALIDATION
 ========================================== */
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
-
-if (
-    !isset($_SESSION['role']) ||
-    $_SESSION['role'] !== 'teacher'
-) {
+if (empty($_SESSION['user_id']) || ($_SESSION['role'] ?? '') !== 'teacher') {
     header("Location: login.php");
     exit;
 }
@@ -23,11 +14,7 @@ if (
 $teacher_id = (int)$_SESSION['user_id'];
 
 function e($value) {
-    return htmlspecialchars(
-        (string)($value ?? ''),
-        ENT_QUOTES,
-        'UTF-8'
-    );
+    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
 /* ==========================================
@@ -42,12 +29,12 @@ $userStmt = mysqli_prepare(
      LIMIT 1"
 );
 
-mysqli_stmt_bind_param(
-    $userStmt,
-    "i",
-    $teacher_id
-);
+if (!$userStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load teacher information.");
+}
 
+mysqli_stmt_bind_param($userStmt, "i", $teacher_id);
 mysqli_stmt_execute($userStmt);
 
 $userResult = mysqli_stmt_get_result($userStmt);
@@ -74,22 +61,35 @@ $selected_class_id = isset($_GET['class_id'])
     : 0;
 
 /* ==========================================
-   TEACHER CLASSES
+   FETCH PRIMARY AND CO-INSTRUCTOR CLASSES
 ========================================== */
 
 $teacherClasses = [];
 
 $classStmt = mysqli_prepare(
     $conn,
-    "SELECT id, class_name
-     FROM classes
-     WHERE teacher_id = ?
-     ORDER BY class_name ASC"
+    "SELECT DISTINCT c.id, c.class_name
+     FROM classes c
+     WHERE
+        c.teacher_id = ?
+        OR EXISTS (
+            SELECT 1
+            FROM class_instructors ci
+            WHERE ci.class_id = c.id
+              AND ci.teacher_id = ?
+        )
+     ORDER BY c.class_name ASC"
 );
+
+if (!$classStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load assigned classes.");
+}
 
 mysqli_stmt_bind_param(
     $classStmt,
-    "i",
+    "ii",
+    $teacher_id,
     $teacher_id
 );
 
@@ -123,8 +123,8 @@ if (
    FETCH ASSESSMENTS AND STATISTICS
 ========================================== */
 
-$params = [$teacher_id];
-$types = "i";
+$params = [$teacher_id, $teacher_id];
+$types = "ii";
 
 $classFilter = "";
 
@@ -133,20 +133,6 @@ if ($selected_class_id > 0) {
     $params[] = $selected_class_id;
     $types .= "i";
 }
-
-/*
-  Turned In:
-    Submitted/done submissions.
-
-  Graded:
-    Submitted/done submissions with grade.
-
-  Assigned:
-    Students enrolled in the class.
-
-  This keeps the original submission statuses
-  used by your classroom system.
-*/
 
 $sql = "
     SELECT
@@ -161,22 +147,22 @@ $sql = "
             SELECT COUNT(*)
             FROM class_students cs
             WHERE cs.class_id = a.class_id
-            AND cs.archived = 0
+              AND (cs.archived = 0 OR cs.archived IS NULL)
         ) AS assigned_count,
 
         (
             SELECT COUNT(*)
             FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.status IN ('submitted', 'done')
+              AND s.status IN ('submitted', 'done')
         ) AS turned_in_count,
 
         (
             SELECT COUNT(*)
             FROM submissions s
             WHERE s.assessment_id = a.id
-            AND s.status IN ('submitted', 'done')
-            AND s.grade IS NOT NULL
+              AND s.status IN ('submitted', 'done')
+              AND s.grade IS NOT NULL
         ) AS graded_count
 
     FROM assessments a
@@ -184,7 +170,15 @@ $sql = "
     INNER JOIN classes c
         ON c.id = a.class_id
 
-    WHERE c.teacher_id = ?
+    WHERE (
+        c.teacher_id = ?
+        OR EXISTS (
+            SELECT 1
+            FROM class_instructors ci
+            WHERE ci.class_id = c.id
+              AND ci.teacher_id = ?
+        )
+    )
 
     $classFilter
 
@@ -203,12 +197,7 @@ if (!$stmt) {
     exit("Unable to load assessments.");
 }
 
-mysqli_stmt_bind_param(
-    $stmt,
-    $types,
-    ...$params
-);
-
+mysqli_stmt_bind_param($stmt, $types, ...$params);
 mysqli_stmt_execute($stmt);
 
 $result = mysqli_stmt_get_result($stmt);
@@ -237,8 +226,6 @@ while ($row = mysqli_fetch_assoc($result)) {
         continue;
     }
 
-    // Group by class ID to avoid merging
-    // classes with identical names.
     $classId = (int)$row['class_id'];
 
     if (!isset($grouped[$classId])) {
@@ -272,15 +259,12 @@ $defaultImages = [
 ];
 
 $hasProfileImage = (
-    !in_array(
-        strtolower($profileName),
-        $defaultImages,
-        true
-    ) &&
+    !in_array(strtolower($profileName), $defaultImages, true) &&
     is_file(__DIR__ . '/uploads/' . $profileName)
 );
 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -372,7 +356,7 @@ $hasProfileImage = (
 
         <li>
             <a href="teacher_to_review.php"
-               class="active-link">
+               class="active">
 
                 <i class="fa-solid fa-clipboard-list"></i>
                 <span>To Review</span>
@@ -394,12 +378,6 @@ $hasProfileImage = (
             </a>
         </li>
 
-        <li>
-            <a href="teacher_resources.php">
-                <i class="fa-solid fa-book-open"></i>
-                <span>Resources</span>
-            </a>
-        </li>
 
     </ul>
 

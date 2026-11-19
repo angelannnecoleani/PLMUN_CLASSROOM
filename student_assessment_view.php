@@ -1,32 +1,67 @@
+
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 require_once 'assessment_attachments.php';
 
-if(!isset($_SESSION['user_id'])){
+/* =========================================
+   LOGIN AND STUDENT ROLE VALIDATION
+========================================= */
+
+if (
+    empty($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'student'
+) {
     header("Location: login.php");
     exit();
 }
 
-if(!isset($_GET['id'])){
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Assessment not found");
 }
 
-$assessment_id = intval($_GET['id']);
-$student_id    = $_SESSION['user_id'];
+$assessment_id = (int) $_GET['id'];
+$student_id    = (int) $_SESSION['user_id'];
+
+if ($assessment_id <= 0) {
+    die("Assessment not found");
+}
+
+/* =========================================
+   CHECK OPTIONAL CREATED_BY COLUMN
+   Supports older databases without it.
+========================================= */
+
+function studentAssessmentHasCreatedBy($conn) {
+    $result = mysqli_query($conn, "SHOW COLUMNS FROM assessments LIKE 'created_by'");
+
+    if (!$result) {
+        return false;
+    }
+
+    $exists = mysqli_num_rows($result) > 0;
+    mysqli_free_result($result);
+
+    return $exists;
+}
+
+$hasCreatedBy = studentAssessmentHasCreatedBy($conn);
 
 /* =========================================
    CURRENT STUDENT + PROFILE IMAGE
 ========================================= */
 
-$student_id = (int) $_SESSION['user_id'];
-
 $uq = mysqli_prepare($conn, "
     SELECT id, name, profile_image
     FROM users
     WHERE id = ?
+      AND role = 'student'
     LIMIT 1
 ");
+
+if (!$uq) {
+    die("Unable to load student information.");
+}
 
 mysqli_stmt_bind_param($uq, "i", $student_id);
 mysqli_stmt_execute($uq);
@@ -47,7 +82,7 @@ if (!$user) {
 ========================================= */
 
 $profileImageFile = '';
-$hasProfileImage = false;
+$hasProfileImage  = false;
 
 $rawProfileImage = trim((string)($user['profile_image'] ?? ''));
 
@@ -61,167 +96,364 @@ $defaultImages = [
 ];
 
 if ($rawProfileImage !== '') {
-
-    // Prevent directory traversal
     $safeName = basename($rawProfileImage);
 
-    // Check if it is not a default image
     if (!in_array(strtolower($safeName), $defaultImages, true)) {
-
         $imagePath = __DIR__ . '/uploads/' . $safeName;
 
         if (is_file($imagePath) && is_readable($imagePath)) {
             $profileImageFile = $safeName;
-            $hasProfileImage = true;
+            $hasProfileImage  = true;
         }
     }
 }
 
-// Maximum number of files/links a student can attach to one submission.
+/* =========================================
+   MAXIMUM SUBMISSION ATTACHMENTS
+========================================= */
+
 $MAX_ATTACHMENTS = 10;
 
-/* ASSESSMENT + CLASS + TEACHER INFO */
-$aq = mysqli_prepare($conn, "
-    SELECT assessments.*, classes.class_name, classes.id AS class_id, users.name AS teacher_name
+/* =========================================
+   GET ASSESSMENT + CLASS + INSTRUCTOR
+   If created_by exists, show the instructor
+   who actually posted the assessment.
+   Otherwise, use the primary instructor.
+========================================= */
+
+if ($hasCreatedBy) {
+    $authorSelect = "
+        COALESCE(
+            NULLIF(assessment_author.name, ''),
+            NULLIF(primary_teacher.name, ''),
+            'Instructor'
+        ) AS teacher_name
+    ";
+
+    $authorJoin = "
+        LEFT JOIN users AS assessment_author
+            ON assessments.created_by = assessment_author.id
+    ";
+} else {
+    $authorSelect = "
+        COALESCE(
+            NULLIF(primary_teacher.name, ''),
+            'Instructor'
+        ) AS teacher_name
+    ";
+
+    $authorJoin = "";
+}
+
+$assessmentSQL = "
+    SELECT
+        assessments.*,
+        classes.class_name,
+        classes.id AS class_id,
+        $authorSelect
     FROM assessments
-    INNER JOIN classes ON assessments.class_id = classes.id
-    INNER JOIN users   ON classes.teacher_id   = users.id
+    INNER JOIN classes
+        ON assessments.class_id = classes.id
+    LEFT JOIN users AS primary_teacher
+        ON classes.teacher_id = primary_teacher.id
+    $authorJoin
     WHERE assessments.id = ?
-");
+    LIMIT 1
+";
+
+$aq = mysqli_prepare($conn, $assessmentSQL);
+
+if (!$aq) {
+    die("Unable to load assessment.");
+}
+
 mysqli_stmt_bind_param($aq, "i", $assessment_id);
 mysqli_stmt_execute($aq);
-$assessment = mysqli_stmt_get_result($aq)->fetch_assoc();
-if(!$assessment) die("Assessment not found");
 
-$class_id = $assessment['class_id'];
+$assessmentResult = mysqli_stmt_get_result($aq);
+$assessment = mysqli_fetch_assoc($assessmentResult);
 
-/* CONFIRM STUDENT BELONGS TO THIS CLASS */
-$check = mysqli_prepare($conn,
-    "SELECT 1 FROM class_students WHERE class_id = ? AND student_id = ?");
+mysqli_stmt_close($aq);
+
+if (!$assessment) {
+    die("Assessment not found");
+}
+
+$class_id = (int) $assessment['class_id'];
+
+/* =========================================
+   CONFIRM ACTIVE STUDENT ENROLLMENT
+========================================= */
+
+$check = mysqli_prepare($conn, "
+    SELECT 1
+    FROM class_students
+    WHERE class_id = ?
+      AND student_id = ?
+      AND (archived = 0 OR archived IS NULL)
+    LIMIT 1
+");
+
+if (!$check) {
+    die("Unable to verify class enrollment.");
+}
+
 mysqli_stmt_bind_param($check, "ii", $class_id, $student_id);
 mysqli_stmt_execute($check);
 mysqli_stmt_store_result($check);
-if(mysqli_stmt_num_rows($check) == 0) die("Access denied");
+
+$isEnrolled = mysqli_stmt_num_rows($check) > 0;
+
 mysqli_stmt_close($check);
 
-/* CURRENT STUDENT (for topbar avatar) */
-$uq = mysqli_prepare($conn, "SELECT * FROM users WHERE id = ?");
-mysqli_stmt_bind_param($uq, "i", $student_id);
-mysqli_stmt_execute($uq);
-$user = mysqli_stmt_get_result($uq)->fetch_assoc();
+if (!$isEnrolled) {
+    http_response_code(403);
+    die("Access denied. You are not actively enrolled in this class.");
+}
 
-/* EXISTING SUBMISSION (if any) */
-$sq = mysqli_prepare($conn,
-    "SELECT * FROM submissions WHERE assessment_id = ? AND student_id = ?");
+/* =========================================
+   EXISTING SUBMISSION
+========================================= */
+
+$sq = mysqli_prepare($conn, "
+    SELECT *
+    FROM submissions
+    WHERE assessment_id = ?
+      AND student_id = ?
+    LIMIT 1
+");
+
+if (!$sq) {
+    die("Unable to load your submission.");
+}
+
 mysqli_stmt_bind_param($sq, "ii", $assessment_id, $student_id);
 mysqli_stmt_execute($sq);
-$submission = mysqli_stmt_get_result($sq)->fetch_assoc();
+
+$submissionResult = mysqli_stmt_get_result($sq);
+$submission = mysqli_fetch_assoc($submissionResult);
+
+mysqli_stmt_close($sq);
+
 $hasSubmissionRow = (bool) $submission;
 
-/* EXISTING SUBMISSION ATTACHMENTS (files + links), if any.
-   NEW TABLE — see submission_attachments.sql migration. */
+/* =========================================
+   EXISTING SUBMISSION ATTACHMENTS
+========================================= */
+
 $submissionAttachments = [];
+
 if ($hasSubmissionRow) {
-    $saq = mysqli_prepare($conn,
-        "SELECT * FROM submission_attachments WHERE submission_id = ? ORDER BY id ASC");
-    mysqli_stmt_bind_param($saq, "i", $submission['id']);
-    mysqli_stmt_execute($saq);
-    $submissionAttachments = mysqli_stmt_get_result($saq)->fetch_all(MYSQLI_ASSOC);
+    $saq = mysqli_prepare($conn, "
+        SELECT *
+        FROM submission_attachments
+        WHERE submission_id = ?
+        ORDER BY id ASC
+    ");
+
+    if ($saq) {
+        $submission_id = (int) $submission['id'];
+
+        mysqli_stmt_bind_param($saq, "i", $submission_id);
+        mysqli_stmt_execute($saq);
+
+        $submissionAttachments = mysqli_stmt_get_result($saq)
+            ->fetch_all(MYSQLI_ASSOC);
+
+        mysqli_stmt_close($saq);
+    }
 }
 
-/* ATTACHMENTS THE TEACHER ADDED TO THE ASSESSMENT (images, files, links) */
+/* =========================================
+   TEACHER-ADDED ASSESSMENT ATTACHMENTS
+========================================= */
+
 $assessmentAttachments = aa_fetch($conn, $assessment_id);
 
-// Older assessments (made before multi-attachments) only have the single
-// image / file / link columns, so fall back to those when the table is empty.
+/*
+ * Backward compatibility for older assessments
+ * that used the original image, attachment, and link columns.
+ */
+
 if (empty($assessmentAttachments)) {
+
     if (!empty($assessment['image'])) {
         $assessmentAttachments[] = [
-            'type' => 'image', 'file_path' => $assessment['image'],
-            'original_name' => $assessment['image'], 'url' => null,
+            'type'          => 'image',
+            'file_path'     => $assessment['image'],
+            'original_name' => $assessment['image'],
+            'url'           => null
         ];
     }
+
     if (!empty($assessment['attachment'])) {
         $assessmentAttachments[] = [
-            'type' => 'file', 'file_path' => $assessment['attachment'],
-            'original_name' => preg_replace('/^assessment_file_[0-9a-f]{13}(?:\.[0-9]+)?_/', '', $assessment['attachment']),
-            'url' => null,
+            'type'          => 'file',
+            'file_path'     => $assessment['attachment'],
+            'original_name' => preg_replace(
+                '/^assessment_file_[0-9a-f]{13}(?:\.[0-9]+)?_/',
+                '',
+                $assessment['attachment']
+            ),
+            'url' => null
         ];
     }
+
     if (!empty($assessment['link'])) {
         $assessmentAttachments[] = [
-            'type' => 'link', 'file_path' => null,
-            'original_name' => null, 'url' => $assessment['link'],
+            'type'          => 'link',
+            'file_path'     => null,
+            'original_name' => null,
+            'url'           => $assessment['link']
         ];
     }
 }
+
+/* =========================================
+   SORT ASSESSMENT ATTACHMENTS
+========================================= */
 
 $attImages = [];
 $attFiles  = [];
 $attLinks  = [];
+
 foreach ($assessmentAttachments as $att) {
-    if ($att['type'] === 'image')    $attImages[] = $att;
-    elseif ($att['type'] === 'file') $attFiles[]  = $att;
-    elseif ($att['type'] === 'link') $attLinks[]  = $att;
+
+    if (($att['type'] ?? '') === 'image') {
+        $attImages[] = $att;
+
+    } elseif (($att['type'] ?? '') === 'file') {
+        $attFiles[] = $att;
+
+    } elseif (($att['type'] ?? '') === 'link') {
+        $attLinks[] = $att;
+    }
 }
 
-// The submissions table only stores 'submitted' or 'done'. Whether nothing has
-// been turned in yet ("assigned") or it's overdue ("missing") is derived here,
-// not stored.
-$isOverdue = !empty($assessment['due_date']) && strtotime($assessment['due_date']) < time();
+/* =========================================
+   ASSESSMENT STATUS
+========================================= */
 
-// NEW: was the submission itself made after the due date?
+$isOverdue = (
+    !empty($assessment['due_date']) &&
+    strtotime($assessment['due_date']) < time()
+);
+
+/* Check whether the submission was late. */
+
 $isLate = false;
-if ($submission && !empty($assessment['due_date'])) {
-    $isLate = strtotime($submission['submitted_at']) > strtotime($assessment['due_date']);
+
+if (
+    $submission &&
+    !empty($submission['submitted_at']) &&
+    !empty($assessment['due_date'])
+) {
+    $isLate = (
+        strtotime($submission['submitted_at']) >
+        strtotime($assessment['due_date'])
+    );
 }
+
+/*
+ * Assigned and missing are derived statuses.
+ * Submitted and done come from the submissions table.
+ */
 
 if (!$submission) {
     $displayStatus = $isOverdue ? 'missing' : 'assigned';
 } else {
-    $displayStatus = $submission['status']; // 'submitted' or 'done'
+    $displayStatus = $submission['status'] ?? 'submitted';
 }
 
 $statusLabels = [
-    'assigned'  => ['text' => 'Assigned',      'class' => 'status-assigned'],
-    'submitted' => ['text' => 'Turned in',     'class' => 'status-done'],
-    'done'      => ['text' => 'Marked as done','class' => 'status-done'],
-    'missing'   => ['text' => 'Missing',       'class' => 'status-missing'],
+    'assigned' => [
+        'text'  => 'Assigned',
+        'class' => 'status-assigned'
+    ],
+    'submitted' => [
+        'text'  => 'Turned in',
+        'class' => 'status-done'
+    ],
+    'done' => [
+        'text'  => 'Marked as done',
+        'class' => 'status-done'
+    ],
+    'missing' => [
+        'text'  => 'Missing',
+        'class' => 'status-missing'
+    ]
 ];
 
 $statusInfo = $statusLabels[$displayStatus]
-    ?? ['text' => ucfirst($displayStatus ?: 'Unknown'), 'class' => 'status-assigned'];
+    ?? [
+        'text'  => ucfirst($displayStatus ?: 'Unknown'),
+        'class' => 'status-assigned'
+    ];
 
-if ($isLate && in_array($displayStatus, ['submitted', 'done'], true)) {
-    $statusInfo['text']  = ($displayStatus === 'done' ? 'Done' : 'Turned in') . ' (Late)';
+if (
+    $isLate &&
+    in_array($displayStatus, ['submitted', 'done'], true)
+) {
+    $statusInfo['text'] = (
+        $displayStatus === 'done'
+            ? 'Done'
+            : 'Turned in'
+    ) . ' (Late)';
+
     $statusInfo['class'] = 'status-late';
 }
 
-// Helper to decide whether a file extension should get an image thumbnail
-// when re-displaying an already-submitted attachment.
+/* =========================================
+   HELPER: CHECK IMAGE EXTENSION
+========================================= */
+
 function isImageExt($path) {
-    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-    return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'], true);
+    $ext = strtolower(pathinfo((string)$path, PATHINFO_EXTENSION));
+
+    return in_array(
+        $ext,
+        ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+        true
+    );
 }
 
-// Font Awesome icon for a teacher-attached file
+/* =========================================
+   HELPER: ATTACHMENT FILE ICON
+========================================= */
+
 if (!function_exists('attachment_icon')) {
     function attachment_icon($name) {
-        $ext = strtolower(pathinfo((string)$name, PATHINFO_EXTENSION));
+
+        $ext = strtolower(
+            pathinfo((string)$name, PATHINFO_EXTENSION)
+        );
+
         switch ($ext) {
-            case 'pdf':  return 'fa-file-pdf';
+            case 'pdf':
+                return 'fa-file-pdf';
+
             case 'doc':
-            case 'docx': return 'fa-file-word';
+            case 'docx':
+                return 'fa-file-word';
+
             case 'ppt':
-            case 'pptx': return 'fa-file-powerpoint';
+            case 'pptx':
+                return 'fa-file-powerpoint';
+
             case 'xls':
-            case 'xlsx': return 'fa-file-excel';
-            case 'txt':  return 'fa-file-lines';
-            default:     return 'fa-file';
+            case 'xlsx':
+                return 'fa-file-excel';
+
+            case 'txt':
+                return 'fa-file-lines';
+
+            default:
+                return 'fa-file';
         }
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -229,6 +461,8 @@ if (!function_exists('attachment_icon')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($assessment['title']); ?></title>
+    <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">

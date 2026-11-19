@@ -1,146 +1,410 @@
+
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 
-// Returns true only if the profile image is real and the file exists on disk
-function hasValidProfileImage($file){
-    if(empty($file)) return false;
-    if(in_array(strtolower($file), ['default.png', 'default.jpg', 'default.jpeg', 'null'])) return false;
-    return file_exists(__DIR__ . '/uploads/' . basename($file));
+/* =========================================
+   PROFILE IMAGE VALIDATION
+========================================= */
+
+function hasValidProfileImage($file) {
+    if (empty($file)) {
+        return false;
+    }
+
+    $filename = basename($file);
+
+    if (in_array(
+        strtolower($filename),
+        ['default.png', 'default.jpg', 'default.jpeg', 'null'],
+        true
+    )) {
+        return false;
+    }
+
+    return is_file(__DIR__ . '/uploads/' . $filename);
 }
 
-// Must be logged in
-if(!isset($_SESSION['user_id'])){
+/* =========================================
+   TEACHER LOGIN VALIDATION
+========================================= */
+
+if (
+    empty($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'teacher'
+) {
     header("Location: login.php");
     exit();
 }
 
-$teacher_id = (int) $_SESSION['user_id'];
-if(!isset($_GET['id'])) die("Class not found");
-$class_id = intval($_GET['id']);
+$teacher_id = (int)$_SESSION['user_id'];
 
-$userQuery = mysqli_query($conn, "SELECT * FROM users WHERE id='$teacher_id'");
-$user      = mysqli_fetch_assoc($userQuery);
+if (!isset($_GET['id']) || (int)$_GET['id'] <= 0) {
+    http_response_code(404);
+    exit("Class not found.");
+}
 
-// Verify ownership
-$classStmt = mysqli_prepare($conn, "SELECT * FROM classes WHERE id = ? AND teacher_id = ?");
-mysqli_stmt_bind_param($classStmt, "ii", $class_id, $teacher_id);
+$class_id = (int)$_GET['id'];
+
+/* =========================================
+   GET TEACHER INFORMATION
+========================================= */
+
+$userStmt = mysqli_prepare(
+    $conn,
+    "SELECT id, name, profile_image
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+);
+
+if (!$userStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load user information.");
+}
+
+mysqli_stmt_bind_param($userStmt, "i", $teacher_id);
+mysqli_stmt_execute($userStmt);
+
+$userResult = mysqli_stmt_get_result($userStmt);
+$user = mysqli_fetch_assoc($userResult);
+
+mysqli_stmt_close($userStmt);
+
+if (!$user) {
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
+/* =========================================
+   VERIFY PRIMARY OR CO-INSTRUCTOR ACCESS
+========================================= */
+
+$classStmt = mysqli_prepare(
+    $conn,
+    "
+    SELECT c.*
+    FROM classes c
+    WHERE c.id = ?
+      AND (
+          c.teacher_id = ?
+          OR EXISTS (
+              SELECT 1
+              FROM class_instructors ci
+              WHERE ci.class_id = c.id
+                AND ci.teacher_id = ?
+          )
+      )
+    LIMIT 1
+    "
+);
+
+if (!$classStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to verify class access.");
+}
+
+mysqli_stmt_bind_param(
+    $classStmt,
+    "iii",
+    $class_id,
+    $teacher_id,
+    $teacher_id
+);
+
 mysqli_stmt_execute($classStmt);
-$class = mysqli_fetch_assoc(mysqli_stmt_get_result($classStmt));
-if(!$class) die("Class not found");
 
-// Students
-$sStmt = mysqli_prepare($conn, "
-    SELECT u.id, u.name, u.profile_image
+$classResult = mysqli_stmt_get_result($classStmt);
+$class = mysqli_fetch_assoc($classResult);
+
+mysqli_stmt_close($classStmt);
+
+if (!$class) {
+    http_response_code(403);
+    exit("You are not authorized to view this class performance.");
+}
+
+/* =========================================
+   FETCH ACTIVE STUDENTS
+========================================= */
+
+$sStmt = mysqli_prepare(
+    $conn,
+    "
+    SELECT
+        u.id,
+        u.name,
+        u.profile_image
     FROM class_students cs
-    INNER JOIN users u ON cs.student_id = u.id
+    INNER JOIN users u
+        ON cs.student_id = u.id
     WHERE cs.class_id = ?
+      AND (cs.archived = 0 OR cs.archived IS NULL)
+      AND u.role = 'student'
     ORDER BY u.name ASC
-");
+    "
+);
+
+if (!$sStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load students.");
+}
+
 mysqli_stmt_bind_param($sStmt, "i", $class_id);
 mysqli_stmt_execute($sStmt);
-$students = mysqli_stmt_get_result($sStmt)->fetch_all(MYSQLI_ASSOC);
 
-// Assessments
-$aStmt = mysqli_prepare($conn, "
-    SELECT id, title, points, type FROM assessments WHERE class_id = ? ORDER BY id ASC
-");
+$students = mysqli_stmt_get_result($sStmt)
+    ->fetch_all(MYSQLI_ASSOC);
+
+mysqli_stmt_close($sStmt);
+
+/* =========================================
+   FETCH ASSESSMENTS
+========================================= */
+
+$aStmt = mysqli_prepare(
+    $conn,
+    "
+    SELECT id, title, points, type
+    FROM assessments
+    WHERE class_id = ?
+    ORDER BY id ASC
+    "
+);
+
+if (!$aStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load assessments.");
+}
+
 mysqli_stmt_bind_param($aStmt, "i", $class_id);
 mysqli_stmt_execute($aStmt);
-$assessments = mysqli_stmt_get_result($aStmt)->fetch_all(MYSQLI_ASSOC);
 
-// Grades
-$gStmt = mysqli_prepare($conn, "
-    SELECT s.student_id, s.assessment_id, s.grade
+$assessments = mysqli_stmt_get_result($aStmt)
+    ->fetch_all(MYSQLI_ASSOC);
+
+mysqli_stmt_close($aStmt);
+
+/* =========================================
+   FETCH GRADES
+========================================= */
+
+$gStmt = mysqli_prepare(
+    $conn,
+    "
+    SELECT
+        s.student_id,
+        s.assessment_id,
+        s.grade
     FROM submissions s
-    INNER JOIN assessments a ON s.assessment_id = a.id
+    INNER JOIN assessments a
+        ON s.assessment_id = a.id
     WHERE a.class_id = ?
-");
+    "
+);
+
+if (!$gStmt) {
+    error_log(mysqli_error($conn));
+    exit("Unable to load grades.");
+}
+
 mysqli_stmt_bind_param($gStmt, "i", $class_id);
 mysqli_stmt_execute($gStmt);
-$gradeRows = mysqli_stmt_get_result($gStmt)->fetch_all(MYSQLI_ASSOC);
-$grades = [];
-foreach($gradeRows as $g) $grades[$g['student_id']][$g['assessment_id']] = $g['grade'];
 
-// Compute per-student stats
+$gradeRows = mysqli_stmt_get_result($gStmt)
+    ->fetch_all(MYSQLI_ASSOC);
+
+mysqli_stmt_close($gStmt);
+
+$grades = [];
+
+foreach ($gradeRows as $g) {
+    $grades[$g['student_id']][$g['assessment_id']] = $g['grade'];
+}
+
+/* =========================================
+   COMPUTE PER-STUDENT STATISTICS
+========================================= */
+
 $studentPerf = [];
-foreach($students as $s){
-    $total = 0; $maxTotal = 0; $count = 0;
-    foreach($assessments as $a){
+
+foreach ($students as $s) {
+
+    $total = 0;
+    $maxTotal = 0;
+    $count = 0;
+
+    foreach ($assessments as $a) {
+
         $g = $grades[$s['id']][$a['id']] ?? null;
-        if($g !== null){
-            $total    += $g;
-            $maxTotal += $a['points'];
+
+        if ($g !== null) {
+            $total += (float)$g;
+            $maxTotal += (float)$a['points'];
             $count++;
         }
     }
-    $pct = ($maxTotal > 0) ? round(($total / $maxTotal) * 100, 1) : null;
+
+    $pct = ($maxTotal > 0)
+        ? round(($total / $maxTotal) * 100, 1)
+        : null;
+
     $studentPerf[$s['id']] = [
-        'pct'            => $pct,
-        'graded'         => $count,
+        'pct' => $pct,
+        'graded' => $count,
         'total_assessed' => count($assessments),
     ];
 }
 
-// Summary counts
-$cExcellent = $cGood = $cAverage = $cNeedsHelp = $cUngraded = 0;
-foreach($studentPerf as $sp){
-    if($sp['pct'] === null){ $cUngraded++; continue; }
-    if($sp['pct'] >= 90)      $cExcellent++;
-    elseif($sp['pct'] >= 75)  $cGood++;
-    elseif($sp['pct'] >= 60)  $cAverage++;
-    else                      $cNeedsHelp++;
+/* =========================================
+   SUMMARY COUNTS
+========================================= */
+
+$cExcellent = 0;
+$cGood = 0;
+$cAverage = 0;
+$cNeedsHelp = 0;
+$cUngraded = 0;
+
+foreach ($studentPerf as $sp) {
+
+    if ($sp['pct'] === null) {
+        $cUngraded++;
+        continue;
+    }
+
+    if ($sp['pct'] >= 90) {
+        $cExcellent++;
+    } elseif ($sp['pct'] >= 75) {
+        $cGood++;
+    } elseif ($sp['pct'] >= 60) {
+        $cAverage++;
+    } else {
+        $cNeedsHelp++;
+    }
 }
 
-// Chart.js data
-$chartLabels = array_map(fn($a) => $a['title'], $assessments);
+/* =========================================
+   CHART.JS DATA
+========================================= */
+
+$chartLabels = array_map(
+    fn($a) => $a['title'],
+    $assessments
+);
+
 $chartColors = [
-    '#3f87b5','#28a745','#f0a500','#dc3545','#7b5fc4',
-    '#17a2b8','#e83e8c','#fd7e14','#6c757d','#20c997',
-    '#0d6efd','#198754','#ffc107','#d63384','#0dcaf0',
+    '#3f87b5',
+    '#28a745',
+    '#f0a500',
+    '#dc3545',
+    '#7b5fc4',
+    '#17a2b8',
+    '#e83e8c',
+    '#fd7e14',
+    '#6c757d',
+    '#20c997',
+    '#0d6efd',
+    '#198754',
+    '#ffc107',
+    '#d63384',
+    '#0dcaf0',
 ];
+
 $chartDatasets = [];
-foreach($students as $i => $s){
+
+foreach ($students as $i => $s) {
+
     $pts = [];
-    foreach($assessments as $a){
-        $g   = $grades[$s['id']][$a['id']] ?? null;
-        $pts[] = ($g !== null && $a['points'] > 0)
-                 ? round(($g / $a['points']) * 100, 1)
-                 : null;
+
+    foreach ($assessments as $a) {
+
+        $g = $grades[$s['id']][$a['id']] ?? null;
+
+        $pts[] = (
+            $g !== null &&
+            (float)$a['points'] > 0
+        )
+            ? round(((float)$g / (float)$a['points']) * 100, 1)
+            : null;
     }
+
     $color = $chartColors[$i % count($chartColors)];
+
     $chartDatasets[] = [
-        'label'            => $s['name'],
-        'data'             => $pts,
-        'borderColor'      => $color,
-        'backgroundColor'  => $color . '20',
-        'tension'          => 0.4,
-        'pointRadius'      => 5,
+        'label' => $s['name'],
+        'data' => $pts,
+        'borderColor' => $color,
+        'backgroundColor' => $color . '20',
+        'tension' => 0.4,
+        'pointRadius' => 5,
         'pointHoverRadius' => 8,
-        'spanGaps'         => true,
-        'borderWidth'      => 2,
+        'spanGaps' => true,
+        'borderWidth' => 2,
     ];
 }
 
-// Bar chart: class average per assessment
+/* =========================================
+   BAR CHART: CLASS AVERAGE PER ASSESSMENT
+========================================= */
+
 $barData = [];
-foreach($assessments as $a){
-    $total = 0; $count = 0;
-    foreach($students as $s){
+
+foreach ($assessments as $a) {
+
+    $total = 0;
+    $count = 0;
+
+    foreach ($students as $s) {
+
         $g = $grades[$s['id']][$a['id']] ?? null;
-        if($g !== null && $a['points'] > 0){
-            $total += ($g / $a['points']) * 100;
+
+        if ($g !== null && (float)$a['points'] > 0) {
+
+            $total += (
+                (float)$g / (float)$a['points']
+            ) * 100;
+
             $count++;
         }
     }
-    $barData[] = $count > 0 ? round($total / $count, 1) : 0;
+
+    $barData[] = $count > 0
+        ? round($total / $count, 1)
+        : 0;
 }
 
-// Donut chart data
-$donutData   = [$cExcellent, $cGood, $cAverage, $cNeedsHelp, $cUngraded];
-$donutColors = ['#28a745','#3f87b5','#f0a500','#dc3545','#adb5bd'];
-$donutLabels = ['Excellent','Good','Average','Needs Help','Ungraded'];
+/* =========================================
+   DONUT CHART DATA
+========================================= */
+
+$donutData = [
+    $cExcellent,
+    $cGood,
+    $cAverage,
+    $cNeedsHelp,
+    $cUngraded
+];
+
+$donutColors = [
+    '#28a745',
+    '#3f87b5',
+    '#f0a500',
+    '#dc3545',
+    '#adb5bd'
+];
+
+$donutLabels = [
+    'Excellent',
+    'Good',
+    'Average',
+    'Needs Help',
+    'Ungraded'
+];
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -177,7 +441,6 @@ $donutLabels = ['Excellent','Good','Average','Needs Help','Ungraded'];
         <li><a href="teacher_to_review.php"><i class="fa-solid fa-clipboard-list"></i><span>To Review</span></a></li>
         <li><a href="teacher_messages.php"><i class="fa-regular fa-message"></i><span>Messages</span></a></li>
         <li><a href="teacher_performance.php" class="active" aria-current="page"><i class="fa-solid fa-chart-pie"></i><span>Performance</span></a></li>
-        <li><a href="teacher_resources.php"><i class="fa-solid fa-book-open"></i><span>Resources</span></a></li>
     </ul>
     <div class="logout-btn">
         <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>

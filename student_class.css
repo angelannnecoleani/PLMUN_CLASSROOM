@@ -2050,3 +2050,18 @@ body {
 .class-page-container h5 {
     overflow-wrap: anywhere;
 }
+
+
+/* CO-INSTRUCTORS IN CLASS BANNER */
+.class-co-instructors {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.95);
+    margin-top: -8px;
+    margin-bottom: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.class-co-instructors i {
+    margin-right: 4px;
+}

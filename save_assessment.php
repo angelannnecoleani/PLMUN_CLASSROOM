@@ -1,55 +1,163 @@
+
 <?php
 session_start();
-include 'database.php';
-include 'auth_helpers.php';
-include_once 'notification_helper.php';
+
+require_once 'database.php';
+require_once 'auth_helpers.php';
+require_once 'notification_helper.php';
 require_once 'assessment_attachments.php';
 
 $role = $_SESSION['role'] ?? '';
 
-/* Must be logged in as a teacher or program chair, and must be a POST */
-if (empty($_SESSION['user_id']) || !in_array($role, ['teacher', 'program_chair'], true)) {
+/* =========================================
+   LOGIN AND ROLE VALIDATION
+========================================= */
+
+if (
+    empty($_SESSION['user_id']) ||
+    !in_array($role, ['teacher', 'program_chair'], true)
+) {
     header("Location: login.php");
     exit();
 }
 
+$user_id = (int) $_SESSION['user_id'];
+
+/* =========================================
+   POST REQUEST VALIDATION
+========================================= */
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: " . ($role === 'program_chair' ? 'program_chair_dashboard.php' : 'teacher_classpage.php'));
+    header(
+        "Location: " .
+        ($role === 'program_chair'
+            ? 'program_chair_dashboard.php'
+            : 'teacher_classpage.php')
+    );
     exit();
 }
 
-$user_id      = (int)$_SESSION['user_id'];
-$class_id     = intval($_POST['class_id'] ?? 0);
-$type         = trim($_POST['type'] ?? 'Quiz');
-$title        = trim($_POST['title'] ?? '');
+/* =========================================
+   GET FORM DATA
+========================================= */
+
+$class_id = (int) ($_POST['class_id'] ?? 0);
+
+$type = trim($_POST['type'] ?? 'Quiz');
+$title = trim($_POST['title'] ?? '');
 $instructions = trim($_POST['instructions'] ?? '');
-$due_date     = aa_combine_datetime($_POST['due_date'] ?? '', $_POST['due_time'] ?? '');
+
+$due_date = aa_combine_datetime(
+    $_POST['due_date'] ?? '',
+    $_POST['due_time'] ?? ''
+);
+
+/* =========================================
+   VALIDATE REQUIRED FIELDS
+========================================= */
 
 if ($class_id <= 0 || $title === '') {
-    die("Missing class or title.");
+    exit("Missing class or assessment title.");
 }
 
-/* teacher: own class / program chair: any class in their program */
-if (!getClassAccess($conn, $class_id, $user_id, $role)) {
+/* =========================================
+   VERIFY CLASS ACCESS
+========================================= */
+
+$class = false;
+
+if ($role === 'teacher') {
+
+    // Primary instructor OR additional assigned instructor.
+
+    $accessStmt = mysqli_prepare(
+        $conn,
+        "SELECT c.id, c.class_name
+         FROM classes c
+         WHERE c.id = ?
+         AND (
+             c.teacher_id = ?
+             OR EXISTS (
+                 SELECT 1
+                 FROM class_instructors ci
+                 WHERE ci.class_id = c.id
+                 AND ci.teacher_id = ?
+             )
+         )
+         LIMIT 1"
+    );
+
+    if (!$accessStmt) {
+        exit("Database error: " . mysqli_error($conn));
+    }
+
+    mysqli_stmt_bind_param(
+        $accessStmt,
+        "iii",
+        $class_id,
+        $user_id,
+        $user_id
+    );
+
+    mysqli_stmt_execute($accessStmt);
+
+    $accessResult = mysqli_stmt_get_result($accessStmt);
+    $class = mysqli_fetch_assoc($accessResult);
+
+    mysqli_stmt_close($accessStmt);
+
+} elseif ($role === 'program_chair') {
+
+    $class = getClassAccess(
+        $conn,
+        $class_id,
+        $user_id,
+        $role
+    );
+}
+
+if (!$class) {
     http_response_code(403);
-    die("Access denied. You do not have access to this class.");
+    exit("Access denied. You do not have permission to create an assessment in this class.");
 }
 
-// Points: dropdown value, or the custom box when "Custom" is chosen
+/* =========================================
+   VALIDATE POINTS
+========================================= */
+
 $points_raw = $_POST['points'] ?? '100';
-$points = ($points_raw === 'custom')
-    ? intval($_POST['custom_points'] ?? 0)
-    : intval($points_raw);
 
-$upload_dir = 'uploads/';
-if (!is_dir($upload_dir)) {
-    mkdir($upload_dir, 0755, true);
+if ($points_raw === 'custom') {
+    $points = (int) ($_POST['custom_points'] ?? 0);
+} else {
+    $points = (int) $points_raw;
 }
 
-/* 1 Insert the assessment itself.
-      image / attachment / link are filled in afterwards by aa_sync_legacy(). */
-$link_placeholder       = '';
-$image_placeholder      = null;
+if ($points <= 0) {
+    exit("Please enter a valid assessment point value.");
+}
+
+/* =========================================
+   UPLOAD DIRECTORY
+========================================= */
+
+$created_by = $user_id;
+
+$upload_dir = __DIR__ . '/uploads/';
+
+if (!is_dir($upload_dir)) {
+    if (!mkdir($upload_dir, 0755, true) && !is_dir($upload_dir)) {
+        exit("Unable to create uploads directory.");
+    }
+}
+
+/* =========================================
+   INSERT ASSESSMENT
+   SAVE ACTUAL LOGGED-IN CREATOR
+========================================= */
+
+$link_placeholder = '';
+$image_placeholder = null;
 $attachment_placeholder = null;
 
 $stmt = mysqli_prepare(
@@ -57,6 +165,7 @@ $stmt = mysqli_prepare(
     "INSERT INTO assessments
     (
         class_id,
+        created_by,
         type,
         title,
         instructions,
@@ -66,17 +175,18 @@ $stmt = mysqli_prepare(
         image,
         attachment
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 );
 
 if (!$stmt) {
-    die("Database error: " . mysqli_error($conn));
+    exit("Database error: " . mysqli_error($conn));
 }
 
 mysqli_stmt_bind_param(
     $stmt,
-    "issssisss",
+    "iissssisss",
     $class_id,
+    $created_by,
     $type,
     $title,
     $instructions,
@@ -88,33 +198,66 @@ mysqli_stmt_bind_param(
 );
 
 if (!mysqli_stmt_execute($stmt)) {
-    die("Could not save assessment: " . mysqli_stmt_error($stmt));
+    $error = mysqli_stmt_error($stmt);
+    mysqli_stmt_close($stmt);
+    exit("Could not save assessment: " . $error);
 }
+
 $assessment_id = mysqli_insert_id($conn);
+
 mysqli_stmt_close($stmt);
 
-/* 2 Optional columns (saved only if they exist in your table) */
-$start_date = aa_combine_datetime($_POST['start_date'] ?? '', $_POST['start_time'] ?? '');
+/* =========================================
+   SAVE OPTIONAL COLUMNS
+========================================= */
+
+$start_date = aa_combine_datetime(
+    $_POST['start_date'] ?? '',
+    $_POST['start_time'] ?? ''
+);
+
 aa_update_optional($conn, $assessment_id, [
     'topic'      => trim($_POST['topic'] ?? ''),
     'start_date' => $start_date,
 ]);
 
-/* 3 Attachments: images[], attachments[], links[]  (max 10 total) */
-aa_save_new($conn, $assessment_id, $upload_dir);
+/* =========================================
+   SAVE ASSESSMENT ATTACHMENTS
+========================================= */
 
-/* 4 Keep the old single image/file/link columns in sync */
-aa_sync_legacy($conn, $assessment_id);
+aa_save_new(
+    $conn,
+    $assessment_id,
+    $upload_dir
+);
 
-/* 5 NOTIFY STUDENTS */
+/* =========================================
+   SYNC LEGACY ATTACHMENT COLUMNS
+========================================= */
+
+aa_sync_legacy(
+    $conn,
+    $assessment_id
+);
+
+/* =========================================
+   NOTIFY CLASS STUDENTS
+========================================= */
+
+$class_name = $class['class_name'] ?? get_class_name($conn, $class_id);
+
 notify_class_students(
     $conn,
     $class_id,
     'assignment',
-    'New ' . strtolower($type) . ' in ' . get_class_name($conn, $class_id) . ': ' . $title,
+    'New ' . strtolower($type) . ' in ' . $class_name . ': ' . $title,
     'student_class.php?id=' . $class_id
 );
 
-/* teacher_assessment.php now serves both teachers and program chairs */
+/* =========================================
+   REDIRECT
+========================================= */
+
 header("Location: teacher_assessment.php?id=" . $class_id);
 exit();
+?>

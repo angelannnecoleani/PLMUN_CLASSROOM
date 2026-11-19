@@ -1,22 +1,25 @@
 <?php
 session_start();
-include 'database.php';
+
+require_once 'database.php';
+require_once 'auth_helpers.php';
 
 /* ==========================================
    LOGIN AND ROLE VALIDATION
 ========================================== */
 
-if (!isset($_SESSION['user_id'])) {
+if (empty($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'teacher') {
+$teacher_id = (int)$_SESSION['user_id'];
+$role = $_SESSION['role'] ?? '';
+
+if (!in_array($role, ['teacher', 'program_chair'], true)) {
     header("Location: login.php");
     exit();
 }
-
-$teacher_id = (int) $_SESSION['user_id'];
 
 /* ==========================================
    HELPER FUNCTIONS
@@ -35,11 +38,6 @@ function fileIconClass($ext) {
     return 'fa-file';
 }
 
-/**
- * Returns a usable URL for a stored profile image, or '' if none exists.
- * Handles: plain filenames, values with a subfolder (profiles/abc.jpg),
- * values already prefixed with uploads/, and blocks ../ tricks.
- */
 function profileImageUrl($value) {
     $value = trim((string)($value ?? ''));
 
@@ -55,55 +53,65 @@ function profileImageUrl($value) {
 
     $name = basename($value);
 
-    if (in_array(strtolower($name), ['default.png', 'default.jpg', 'default.jpeg'])) {
+    if (in_array(strtolower($name), [
+        'default.png',
+        'default.jpg',
+        'default.jpeg',
+        'default.svg'
+    ])) {
         return '';
     }
 
     $candidates = [
         ltrim($value, '/'),
         'uploads/' . ltrim($value, '/'),
-        'uploads/' . $name,
+        'uploads/' . $name
     ];
 
     foreach ($candidates as $rel) {
         if (is_file(__DIR__ . '/' . $rel)) {
-            return implode('/', array_map('rawurlencode', explode('/', $rel)));
+            return implode(
+                '/',
+                array_map('rawurlencode', explode('/', $rel))
+            );
         }
     }
 
     return '';
 }
 
-/**
- * Renders an avatar: the image if it exists, otherwise a user icon.
- * If the image fails to load in the browser, it swaps to the icon too.
- */
-function avatarHtml($value, $class = 'profile-pic', $defaultClass = 'default-profile') {
+function avatarHtml(
+    $value,
+    $class = 'profile-pic',
+    $defaultClass = 'default-profile'
+) {
     $url = profileImageUrl($value);
 
     if ($url !== '') {
-        return '<img src="' . htmlspecialchars($url) . '" class="' . $class . '" alt=""'
-             . ' onerror="this.outerHTML=\'<div class=&quot;' . $class . ' ' . $defaultClass
-             . '&quot;><i class=&quot;fa-solid fa-user&quot;></i></div>\'">';
+        return '<img src="' .
+            htmlspecialchars($url, ENT_QUOTES, 'UTF-8') .
+            '" class="' . $class . '" alt="">';
     }
 
-    return '<div class="' . $class . ' ' . $defaultClass . '"><i class="fa-solid fa-user"></i></div>';
+    return '<div class="' . $class . ' ' . $defaultClass . '">
+                <i class="fa-solid fa-user"></i>
+            </div>';
 }
 
 /* ==========================================
-   FETCH TEACHER
+   FETCH LOGGED-IN USER
 ========================================== */
 
 $userStmt = mysqli_prepare(
     $conn,
-    "SELECT id, name, profile_image
+    "SELECT id, name, profile_image, role
      FROM users
      WHERE id = ?
      LIMIT 1"
 );
 
 if (!$userStmt) {
-    die("Database error: " . mysqli_error($conn));
+    die("Database error: " . htmlspecialchars(mysqli_error($conn)));
 }
 
 mysqli_stmt_bind_param($userStmt, "i", $teacher_id);
@@ -114,7 +122,7 @@ $user = mysqli_fetch_assoc($userResult);
 
 mysqli_stmt_close($userStmt);
 
-if (!$user) {
+if (!$user || $user['role'] !== $role) {
     session_destroy();
     header("Location: login.php");
     exit();
@@ -128,30 +136,29 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Class not found.");
 }
 
-$id = (int) $_GET['id'];
+$id = (int)$_GET['id'];
 
 if ($id <= 0) {
     die("Invalid class ID.");
 }
 
 /* ==========================================
-   FETCH ASSIGNED CLASS
+   FETCH CLASS
 ========================================== */
 
 $classStmt = mysqli_prepare(
     $conn,
-    "SELECT *
-     FROM classes
-     WHERE id = ?
-     AND teacher_id = ?
+    "SELECT c.*
+     FROM classes c
+     WHERE c.id = ?
      LIMIT 1"
 );
 
 if (!$classStmt) {
-    die("Database error: " . mysqli_error($conn));
+    die("Database error: " . htmlspecialchars(mysqli_error($conn)));
 }
 
-mysqli_stmt_bind_param($classStmt, "ii", $id, $teacher_id);
+mysqli_stmt_bind_param($classStmt, "i", $id);
 mysqli_stmt_execute($classStmt);
 
 $classResult = mysqli_stmt_get_result($classStmt);
@@ -160,15 +167,117 @@ $class = mysqli_fetch_assoc($classResult);
 mysqli_stmt_close($classStmt);
 
 if (!$class) {
+    http_response_code(404);
+    die("Class not found.");
+}
+
+/* ==========================================
+   CHECK CLASS ACCESS
+========================================== */
+
+$hasAccess = false;
+
+if ($role === 'teacher') {
+
+    // Primary instructor or additional assigned instructor.
+    $accessStmt = mysqli_prepare(
+        $conn,
+        "SELECT c.id
+         FROM classes c
+         WHERE c.id = ?
+         AND (
+             c.teacher_id = ?
+             OR EXISTS (
+                 SELECT 1
+                 FROM class_instructors ci
+                 WHERE ci.class_id = c.id
+                 AND ci.teacher_id = ?
+             )
+         )
+         LIMIT 1"
+    );
+
+    if (!$accessStmt) {
+        die("Class access database error: " .
+            htmlspecialchars(mysqli_error($conn)));
+    }
+
+    mysqli_stmt_bind_param(
+        $accessStmt,
+        "iii",
+        $id,
+        $teacher_id,
+        $teacher_id
+    );
+
+    mysqli_stmt_execute($accessStmt);
+
+    $accessResult = mysqli_stmt_get_result($accessStmt);
+    $hasAccess = mysqli_num_rows($accessResult) > 0;
+
+    mysqli_stmt_close($accessStmt);
+
+} elseif ($role === 'program_chair') {
+
+    // Program chair access is handled by your existing helper.
+    $hasAccess = (bool)getClassAccess(
+        $conn,
+        $id,
+        $teacher_id,
+        $role
+    );
+}
+
+if (!$hasAccess) {
     http_response_code(403);
-    die("Access denied. This class is not assigned to your account.");
+    die("Access denied. You are not authorized to access this class.");
+}
+
+/* ==========================================
+   GET PRIMARY INSTRUCTOR NAME
+========================================== */
+
+$classTeacherName = 'No instructor assigned';
+
+if (!empty($class['teacher_id'])) {
+
+    $teacherStmt = mysqli_prepare(
+        $conn,
+        "SELECT name
+         FROM users
+         WHERE id = ?
+         LIMIT 1"
+    );
+
+    if ($teacherStmt) {
+        $primaryTeacherId = (int)$class['teacher_id'];
+
+        mysqli_stmt_bind_param(
+            $teacherStmt,
+            "i",
+            $primaryTeacherId
+        );
+
+        mysqli_stmt_execute($teacherStmt);
+
+        $teacherResult = mysqli_stmt_get_result($teacherStmt);
+        $primaryTeacher = mysqli_fetch_assoc($teacherResult);
+
+        if ($primaryTeacher) {
+            $classTeacherName = $primaryTeacher['name'];
+        }
+
+        mysqli_stmt_close($teacherStmt);
+    }
 }
 
 /* ==========================================
    PROFILE IMAGE (TOPBAR)
 ========================================== */
 
-$topbarImageUrl = profileImageUrl($user['profile_image'] ?? '');
+$topbarImageUrl = profileImageUrl(
+    $user['profile_image'] ?? ''
+);
 
 /* ==========================================
    ANNOUNCEMENT ATTACHMENTS
@@ -228,6 +337,7 @@ if ($matStmt) {
     mysqli_stmt_close($matStmt);
 }
 
+
 /* ==========================================
    LOAD CLASS STREAM
 ========================================== */
@@ -236,6 +346,7 @@ $streamStmt = mysqli_prepare(
     $conn,
     "SELECT * FROM (
 
+        /* ANNOUNCEMENTS */
         SELECT
             a.id,
             a.content,
@@ -262,14 +373,22 @@ $streamStmt = mysqli_prepare(
 
         UNION ALL
 
+        /* ASSESSMENTS */
         SELECT
             ass.id,
             NULL AS content,
             ass.image,
             ass.link,
             ass.created_at,
-            COALESCE(u.name, 'Unknown Teacher') AS name,
-            u.profile_image,
+            COALESCE(
+                creator.name,
+                primary_teacher.name,
+                'Unknown Teacher'
+            ) AS name,
+            COALESCE(
+                creator.profile_image,
+                primary_teacher.profile_image
+            ) AS profile_image,
             'assessment' AS post_type,
             ass.title,
             ass.instructions AS description,
@@ -284,21 +403,32 @@ $streamStmt = mysqli_prepare(
         LEFT JOIN classes c
             ON ass.class_id = c.id
 
-        LEFT JOIN users u
-            ON c.teacher_id = u.id
+        LEFT JOIN users creator
+            ON ass.created_by = creator.id
+
+        LEFT JOIN users primary_teacher
+            ON c.teacher_id = primary_teacher.id
 
         WHERE ass.class_id = ?
 
         UNION ALL
 
+        /* MATERIALS */
         SELECT
             m.id,
             NULL AS content,
             NULL AS image,
             m.link,
             m.created_at,
-            COALESCE(u.name, 'Unknown Teacher') AS name,
-            u.profile_image,
+            COALESCE(
+                creator.name,
+                primary_teacher.name,
+                'Unknown Teacher'
+            ) AS name,
+            COALESCE(
+                creator.profile_image,
+                primary_teacher.profile_image
+            ) AS profile_image,
             'material' AS post_type,
             m.title,
             m.description,
@@ -313,8 +443,11 @@ $streamStmt = mysqli_prepare(
         LEFT JOIN classes c
             ON m.class_id = c.id
 
-        LEFT JOIN users u
-            ON c.teacher_id = u.id
+        LEFT JOIN users creator
+            ON m.created_by = creator.id
+
+        LEFT JOIN users primary_teacher
+            ON c.teacher_id = primary_teacher.id
 
         WHERE m.class_id = ?
 
@@ -324,10 +457,17 @@ $streamStmt = mysqli_prepare(
 );
 
 if (!$streamStmt) {
-    die("Stream SQL Error: " . mysqli_error($conn));
+    die("Stream SQL Error: " . htmlspecialchars(mysqli_error($conn)));
 }
 
-mysqli_stmt_bind_param($streamStmt, "iii", $id, $id, $id);
+mysqli_stmt_bind_param(
+    $streamStmt,
+    "iii",
+    $id,
+    $id,
+    $id
+);
+
 mysqli_stmt_execute($streamStmt);
 
 $stream = mysqli_stmt_get_result($streamStmt);
@@ -335,7 +475,9 @@ $stream = mysqli_stmt_get_result($streamStmt);
 if (!$stream) {
     die("Unable to load class stream.");
 }
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -343,10 +485,9 @@ if (!$stream) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title><?php echo htmlspecialchars($class['class_name']); ?></title>
+    <title><?php echo htmlspecialchars($class['class_name'], ENT_QUOTES, 'UTF-8'); ?></title>
 
     <link rel="stylesheet" href="teacher_class.css?v=6">
-    <!-- NEW: edit / delete message styles -->
     <link rel="stylesheet" href="class_chat_actions.css?v=2">
     <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
 
@@ -408,12 +549,7 @@ if (!$stream) {
             </a>
         </li>
 
-        <li>
-            <a href="teacher_resources.php">
-                <i class="fa-solid fa-book-open"></i>
-                <span>Resources</span>
-            </a>
-        </li>
+
     </ul>
 
     <div class="logout-btn">
@@ -450,7 +586,7 @@ if (!$stream) {
 
                 <?php if (!empty($class['meet_link'])): ?>
 
-                    <a href="<?php echo htmlspecialchars($class['meet_link']); ?>"
+                    <a href="<?php echo htmlspecialchars($class['meet_link'], ENT_QUOTES, 'UTF-8'); ?>"
                        target="_blank"
                        rel="noopener noreferrer"
                        class="meet-button"
@@ -489,7 +625,7 @@ if (!$stream) {
                 <?php if ($topbarImageUrl !== ''): ?>
 
                     <img
-                        src="<?php echo htmlspecialchars($topbarImageUrl); ?>"
+                        src="<?php echo htmlspecialchars($topbarImageUrl, ENT_QUOTES, 'UTF-8'); ?>"
                         alt="Profile"
                         onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('beforeend','<i class=&quot;fa-solid fa-user&quot;></i>');"
                     >
@@ -535,22 +671,22 @@ if (!$stream) {
         <div class="class-banner mb-4">
 
             <h2>
-                <?php echo htmlspecialchars($class['class_name']); ?>
+                <?php echo htmlspecialchars($class['class_name'], ENT_QUOTES, 'UTF-8'); ?>
             </h2>
 
             <h5>
-                <?php echo htmlspecialchars($user['name']); ?>
+                <?php echo htmlspecialchars($classTeacherName, ENT_QUOTES, 'UTF-8'); ?>
             </h5>
 
             <p>
-                <?php echo htmlspecialchars($class['section'] ?? ''); ?>
+                <?php echo htmlspecialchars($class['section'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
                 |
-                <?php echo htmlspecialchars($class['schedule'] ?? ''); ?>
+                <?php echo htmlspecialchars($class['schedule'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
             </p>
 
             <?php if (!empty($class['program'])): ?>
                 <small>
-                    <?php echo htmlspecialchars($class['program']); ?>
+                    <?php echo htmlspecialchars($class['program'], ENT_QUOTES, 'UTF-8'); ?>
                 </small>
             <?php endif; ?>
 
@@ -566,7 +702,7 @@ if (!$stream) {
                     <h6>Class Code</h6>
 
                     <strong>
-                        <?php echo htmlspecialchars($class['class_code']); ?>
+                        <?php echo htmlspecialchars($class['class_code'], ENT_QUOTES, 'UTF-8'); ?>
                     </strong>
 
                 </div>
@@ -665,7 +801,7 @@ if (!$stream) {
                         <div class="card-body">
 
                             <h6 class="fw-bold">
-                                Welcome to <?php echo htmlspecialchars($class['class_name']); ?>
+                                Welcome to <?php echo htmlspecialchars($class['class_name'], ENT_QUOTES, 'UTF-8'); ?>
                             </h6>
 
                             <p class="text-muted mb-0">
@@ -683,7 +819,6 @@ if (!$stream) {
 
                     <?php if ($row['post_type'] === 'announcement'): ?>
 
-                        <!-- ANNOUNCEMENT CARD -->
                         <div class="announcement-card mb-3">
 
                             <div class="announcement-header">
@@ -695,7 +830,7 @@ if (!$stream) {
                                     <div>
 
                                         <h6 class="mb-0">
-                                            <?php echo htmlspecialchars($row['name']); ?>
+                                            <?php echo htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8'); ?>
                                         </h6>
 
                                         <small class="text-muted">
@@ -724,15 +859,11 @@ if (!$stream) {
                                                href="pin_announcement.php?id=<?php echo (int)$row['id']; ?>">
 
                                                 <?php if ($row['pinned']): ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2 text-warning"></i>
                                                     Unpin
-
                                                 <?php else: ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2"></i>
                                                     Pin
-
                                                 <?php endif; ?>
 
                                             </a>
@@ -770,42 +901,32 @@ if (!$stream) {
                             <div class="announcement-content mt-3">
 
                                 <?php if ($row['pinned']): ?>
-
                                     <span class="pinned-label">
                                         <i class="fa-solid fa-thumbtack me-1"></i>
                                         Pinned
                                     </span>
-
                                 <?php endif; ?>
 
                                 <?php if (trim((string)$row['content']) !== ''): ?>
-
                                     <p>
-                                        <?php echo nl2br(htmlspecialchars($row['content'])); ?>
+                                        <?php echo nl2br(htmlspecialchars($row['content'], ENT_QUOTES, 'UTF-8')); ?>
                                     </p>
-
                                 <?php endif; ?>
 
                                 <?php if (!empty($row['link'])): ?>
-
-                                    <a href="<?php echo htmlspecialchars($row['link']); ?>"
+                                    <a href="<?php echo htmlspecialchars($row['link'], ENT_QUOTES, 'UTF-8'); ?>"
                                        target="_blank"
                                        rel="noopener noreferrer">
-
-                                        <?php echo htmlspecialchars($row['link']); ?>
-
+                                        <?php echo htmlspecialchars($row['link'], ENT_QUOTES, 'UTF-8'); ?>
                                     </a>
-
                                 <?php endif; ?>
 
                                 <?php if (!empty($row['image'])): ?>
-
                                     <img
-                                        src="uploads/<?php echo htmlspecialchars(basename($row['image'])); ?>"
+                                        src="uploads/<?php echo htmlspecialchars(basename($row['image']), ENT_QUOTES, 'UTF-8'); ?>"
                                         class="announcement-image"
                                         alt="Announcement image"
                                     >
-
                                 <?php endif; ?>
 
                                 <?php
@@ -836,12 +957,12 @@ if (!$stream) {
 
                                                 <?php foreach ($aImgs as $a): ?>
 
-                                                    <a href="uploads/<?php echo htmlspecialchars(basename($a['path'])); ?>"
+                                                    <a href="uploads/<?php echo htmlspecialchars(basename($a['path']), ENT_QUOTES, 'UTF-8'); ?>"
                                                        target="_blank">
 
                                                         <img
-                                                            src="uploads/<?php echo htmlspecialchars(basename($a['path'])); ?>"
-                                                            alt="<?php echo htmlspecialchars($a['original_name'] ?? ''); ?>"
+                                                            src="uploads/<?php echo htmlspecialchars(basename($a['path']), ENT_QUOTES, 'UTF-8'); ?>"
+                                                            alt="<?php echo htmlspecialchars($a['original_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>"
                                                         >
 
                                                     </a>
@@ -860,14 +981,14 @@ if (!$stream) {
                                         ?>
 
                                             <a class="post-file"
-                                               href="uploads/<?php echo htmlspecialchars(basename($a['path'])); ?>"
+                                               href="uploads/<?php echo htmlspecialchars(basename($a['path']), ENT_QUOTES, 'UTF-8'); ?>"
                                                target="_blank"
-                                               download="<?php echo htmlspecialchars($fname); ?>">
+                                               download="<?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>">
 
                                                 <i class="fa-solid <?php echo fileIconClass($fext); ?>"></i>
 
                                                 <span>
-                                                    <?php echo htmlspecialchars($fname); ?>
+                                                    <?php echo htmlspecialchars($fname, ENT_QUOTES, 'UTF-8'); ?>
                                                 </span>
 
                                             </a>
@@ -877,14 +998,14 @@ if (!$stream) {
                                         <?php foreach ($aLinks as $a): ?>
 
                                             <a class="post-link"
-                                               href="<?php echo htmlspecialchars($a['path']); ?>"
+                                               href="<?php echo htmlspecialchars($a['path'], ENT_QUOTES, 'UTF-8'); ?>"
                                                target="_blank"
                                                rel="noopener noreferrer">
 
                                                 <i class="fa-solid fa-link"></i>
 
                                                 <span>
-                                                    <?php echo htmlspecialchars($a['path']); ?>
+                                                    <?php echo htmlspecialchars($a['path'], ENT_QUOTES, 'UTF-8'); ?>
                                                 </span>
 
                                             </a>
@@ -901,7 +1022,6 @@ if (!$stream) {
 
                     <?php elseif ($row['post_type'] === 'assessment'): ?>
 
-                        <!-- ASSESSMENT CARD -->
                         <div class="announcement-card assessment-post stream-row-card mb-3">
 
                             <div class="announcement-header-inline">
@@ -910,9 +1030,7 @@ if (!$stream) {
                                    class="stream-row">
 
                                     <div class="stream-row-icon <?php echo strtolower($row['assessment_type'] ?? '') === 'quiz' ? 'icon-quiz' : 'icon-assignment'; ?>">
-
                                         <i class="fa-solid fa-clipboard"></i>
-
                                     </div>
 
                                     <div class="stream-row-body">
@@ -920,24 +1038,22 @@ if (!$stream) {
                                         <div class="stream-row-title">
 
                                             <?php if ($row['pinned']): ?>
-
                                                 <span class="pinned-label me-2">
                                                     <i class="fa-solid fa-thumbtack me-1"></i>
                                                     Pinned
                                                 </span>
-
                                             <?php endif; ?>
 
                                             <strong>
-                                                <?php echo htmlspecialchars($row['name']); ?>
+                                                <?php echo htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8'); ?>
                                             </strong>
 
                                             posted a new
 
-                                            <?php echo htmlspecialchars(strtolower($row['assessment_type'] ?? 'assessment')); ?>:
+                                            <?php echo htmlspecialchars(strtolower($row['assessment_type'] ?? 'assessment'), ENT_QUOTES, 'UTF-8'); ?>:
 
                                             <strong>
-                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled assessment'); ?>
+                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled assessment', ENT_QUOTES, 'UTF-8'); ?>
                                             </strong>
 
                                         </div>
@@ -962,7 +1078,7 @@ if (!$stream) {
                                             <span class="dot"></span>
 
                                             <span>
-                                                <?php echo htmlspecialchars($row['points'] ?? '0'); ?> points
+                                                <?php echo htmlspecialchars($row['points'] ?? '0', ENT_QUOTES, 'UTF-8'); ?> points
                                             </span>
 
                                         </div>
@@ -977,9 +1093,7 @@ if (!$stream) {
                                             type="button"
                                             data-bs-toggle="dropdown"
                                             aria-expanded="false">
-
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
-
                                     </button>
 
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -989,15 +1103,11 @@ if (!$stream) {
                                                href="pin_assessment.php?id=<?php echo (int)$row['id']; ?>">
 
                                                 <?php if ($row['pinned']): ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2 text-warning"></i>
                                                     Unpin
-
                                                 <?php else: ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2"></i>
                                                     Pin
-
                                                 <?php endif; ?>
 
                                             </a>
@@ -1006,10 +1116,8 @@ if (!$stream) {
                                         <li>
                                             <a class="dropdown-item"
                                                href="edit_assessment.php?id=<?php echo (int)$row['id']; ?>&class_id=<?php echo $id; ?>">
-
                                                 <i class="fa-solid fa-pen me-2"></i>
                                                 Edit
-
                                             </a>
                                         </li>
 
@@ -1019,10 +1127,8 @@ if (!$stream) {
                                             <a class="dropdown-item text-danger"
                                                href="delete_assessment.php?id=<?php echo (int)$row['id']; ?>&class_id=<?php echo $id; ?>"
                                                onclick="return confirm('Delete this assessment?')">
-
                                                 <i class="fa-solid fa-trash me-2"></i>
                                                 Delete
-
                                             </a>
                                         </li>
 
@@ -1036,7 +1142,6 @@ if (!$stream) {
 
                     <?php elseif ($row['post_type'] === 'material'): ?>
 
-                        <!-- MATERIAL CARD -->
                         <div class="announcement-card material-post stream-row-card mb-3">
 
                             <div class="announcement-header-inline">
@@ -1055,32 +1160,28 @@ if (!$stream) {
                                         <div class="stream-row-title">
 
                                             <?php if ($row['pinned']): ?>
-
                                                 <span class="pinned-label me-2">
                                                     <i class="fa-solid fa-thumbtack me-1"></i>
                                                     Pinned
                                                 </span>
-
                                             <?php endif; ?>
 
                                             <strong>
-                                                <?php echo htmlspecialchars($row['name']); ?>
+                                                <?php echo htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8'); ?>
                                             </strong>
 
                                             posted a new material:
 
                                             <strong>
-                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled material'); ?>
+                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled material', ENT_QUOTES, 'UTF-8'); ?>
                                             </strong>
 
                                         </div>
 
                                         <div class="stream-row-meta">
-
                                             <span>
                                                 <?php echo date("M d, Y h:i A", strtotime($row['created_at'])); ?>
                                             </span>
-
                                         </div>
 
                                     </div>
@@ -1093,9 +1194,7 @@ if (!$stream) {
                                             type="button"
                                             data-bs-toggle="dropdown"
                                             aria-expanded="false">
-
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
-
                                     </button>
 
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -1105,15 +1204,11 @@ if (!$stream) {
                                                href="pin_material.php?id=<?php echo (int)$row['id']; ?>">
 
                                                 <?php if ($row['pinned']): ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2 text-warning"></i>
                                                     Unpin
-
                                                 <?php else: ?>
-
                                                     <i class="fa-solid fa-thumbtack me-2"></i>
                                                     Pin
-
                                                 <?php endif; ?>
 
                                             </a>
@@ -1122,10 +1217,8 @@ if (!$stream) {
                                         <li>
                                             <a class="dropdown-item"
                                                href="edit_material.php?id=<?php echo (int)$row['id']; ?>&class_id=<?php echo $id; ?>">
-
                                                 <i class="fa-solid fa-pen me-2"></i>
                                                 Edit
-
                                             </a>
                                         </li>
 
@@ -1135,10 +1228,8 @@ if (!$stream) {
                                             <a class="dropdown-item text-danger"
                                                href="delete_material.php?id=<?php echo (int)$row['id']; ?>&class_id=<?php echo $id; ?>"
                                                onclick="return confirm('Delete this material?')">
-
                                                 <i class="fa-solid fa-trash me-2"></i>
                                                 Delete
-
                                             </a>
                                         </li>
 
@@ -1169,7 +1260,7 @@ if (!$stream) {
                                             </div>
 
                                             <h5 class="material-modal-title">
-                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled material'); ?>
+                                                <?php echo htmlspecialchars($row['title'] ?? 'Untitled material', ENT_QUOTES, 'UTF-8'); ?>
                                             </h5>
 
                                         </div>
@@ -1178,9 +1269,7 @@ if (!$stream) {
                                                 class="material-close-btn"
                                                 data-bs-dismiss="modal"
                                                 aria-label="Close">
-
                                             <i class="fa-solid fa-xmark"></i>
-
                                         </button>
 
                                     </div>
@@ -1196,7 +1285,7 @@ if (!$stream) {
                                                 <div class="material-teacher-details">
 
                                                     <strong>
-                                                        <?php echo htmlspecialchars($row['name']); ?>
+                                                        <?php echo htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8'); ?>
                                                     </strong>
 
                                                     <span>
@@ -1220,17 +1309,13 @@ if (!$stream) {
                                         <div class="material-divider"></div>
 
                                         <?php if (!empty($row['description'])): ?>
-
                                             <div class="material-caption">
-                                                <?php echo nl2br(htmlspecialchars($row['description'])); ?>
+                                                <?php echo nl2br(htmlspecialchars($row['description'], ENT_QUOTES, 'UTF-8')); ?>
                                             </div>
-
                                         <?php else: ?>
-
                                             <div class="material-caption material-caption-empty">
                                                 No caption provided.
                                             </div>
-
                                         <?php endif; ?>
 
                                         <?php
@@ -1261,19 +1346,13 @@ if (!$stream) {
                                             }
                                         }
 
-                                        $imageExtensions = [
-                                            'jpg',
-                                            'jpeg',
-                                            'png',
-                                            'gif',
-                                            'webp'
-                                        ];
+                                        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
                                         ?>
 
                                         <!-- MATERIAL LINKS -->
                                         <?php foreach ($mLinks as $lnk): ?>
 
-                                            <a href="<?php echo htmlspecialchars($lnk); ?>"
+                                            <a href="<?php echo htmlspecialchars($lnk, ENT_QUOTES, 'UTF-8'); ?>"
                                                target="_blank"
                                                rel="noopener noreferrer"
                                                class="material-link-box">
@@ -1281,7 +1360,7 @@ if (!$stream) {
                                                 <i class="fa-solid fa-link"></i>
 
                                                 <span>
-                                                    <?php echo htmlspecialchars($lnk); ?>
+                                                    <?php echo htmlspecialchars($lnk, ENT_QUOTES, 'UTF-8'); ?>
                                                 </span>
 
                                                 <i class="fa-solid fa-arrow-up-right-from-square"></i>
@@ -1307,21 +1386,21 @@ if (!$stream) {
 
                                                         <?php if (in_array($ext, $imageExtensions)): ?>
 
-                                                            <a href="<?php echo htmlspecialchars($url); ?>"
+                                                            <a href="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>"
                                                                target="_blank"
                                                                rel="noopener"
                                                                class="material-file-preview image-preview">
 
                                                                 <img
-                                                                    src="<?php echo htmlspecialchars($url); ?>"
-                                                                    alt="<?php echo htmlspecialchars($fileName); ?>"
+                                                                    src="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>"
+                                                                    alt="<?php echo htmlspecialchars($fileName, ENT_QUOTES, 'UTF-8'); ?>"
                                                                 >
 
                                                             </a>
 
                                                         <?php else: ?>
 
-                                                            <a href="<?php echo htmlspecialchars($url); ?>"
+                                                            <a href="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>"
                                                                target="_blank"
                                                                rel="noopener"
                                                                class="material-file-preview">
@@ -1332,12 +1411,12 @@ if (!$stream) {
 
                                                         <?php endif; ?>
 
-                                                        <a href="<?php echo htmlspecialchars($url); ?>"
+                                                        <a href="<?php echo htmlspecialchars($url, ENT_QUOTES, 'UTF-8'); ?>"
                                                            target="_blank"
                                                            rel="noopener"
                                                            class="material-file-name">
 
-                                                            <?php echo htmlspecialchars($fileName); ?>
+                                                            <?php echo htmlspecialchars($fileName, ENT_QUOTES, 'UTF-8'); ?>
 
                                                         </a>
 
@@ -1371,10 +1450,7 @@ if (!$stream) {
 
 </div>
 
-<!-- ==========================================
-     FLOATING GROUP CHAT
-========================================== -->
-
+<!-- FLOATING GROUP CHAT -->
 <div class="gchat-widget" id="gchatWidget">
 
     <div class="gchat-header">
@@ -1440,10 +1516,7 @@ if (!$stream) {
 
 </button>
 
-<!-- ==========================================
-     GOOGLE MEET MODAL
-========================================== -->
-
+<!-- GOOGLE MEET MODAL -->
 <div class="modal fade" id="meetModal" tabindex="-1">
 
     <div class="modal-dialog modal-dialog-centered">
@@ -1491,7 +1564,7 @@ if (!$stream) {
                            id="meetLinkInput"
                            class="meet-link-input"
                            placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                           value="<?php echo htmlspecialchars($class['meet_link'] ?? ''); ?>">
+                           value="<?php echo htmlspecialchars($class['meet_link'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
 
                     <div id="meetLinkError" class="meet-link-error"></div>
 
@@ -1504,18 +1577,14 @@ if (!$stream) {
                 <button type="button"
                         class="btn-modal-cancel"
                         data-bs-dismiss="modal">
-
                     Cancel
-
                 </button>
 
                 <button type="button"
                         class="btn-modal-save"
                         id="saveMeetBtn"
                         onclick="saveMeetLink()">
-
                     Save
-
                 </button>
 
             </div>
@@ -1526,10 +1595,7 @@ if (!$stream) {
 
 </div>
 
-<!-- ==========================================
-     ANNOUNCEMENT LINK MODAL
-========================================== -->
-
+<!-- ANNOUNCEMENT LINK MODAL -->
 <div class="modal fade" id="linkModal" tabindex="-1" aria-hidden="true">
 
     <div class="modal-dialog modal-dialog-centered">
@@ -1566,17 +1632,13 @@ if (!$stream) {
                 <button type="button"
                         class="btn-modal-cancel"
                         data-bs-dismiss="modal">
-
                     Cancel
-
                 </button>
 
                 <button type="button"
                         class="btn-modal-save"
                         onclick="saveAnnounceLink()">
-
                     Add link
-
                 </button>
 
             </div>
@@ -1587,17 +1649,11 @@ if (!$stream) {
 
 </div>
 
-<!-- NEW: edit / delete message logic (must load before the chat script below) -->
 <script src="class_chat_actions.js?v=2"></script>
-<!-- NEW: unread (missed message) badges -->
 <script src="class_chat_unread.js?v=2"></script>
-<!-- NEW: @mentions -->
 <script src="class_chat_mentions.js?v=1"></script>
 
-<!-- ==========================================
-     GROUP CHAT JAVASCRIPT
-========================================== -->
-
+<!-- GROUP CHAT JAVASCRIPT -->
 <script>
 (function () {
 
@@ -1625,21 +1681,22 @@ if (!$stream) {
     const fileInput = document.getElementById('gchatFileUpload');
     const preview = document.getElementById('gchatPreview');
 
-    // NEW: @mentions (type @ to pick someone)
     ChatMentions.init({ meId: <?php echo (int)$teacher_id; ?> });
     ChatMentions.attach({ input: input, classId: CLASS_ID });
 
-
-    // NEW: set up edit / delete for this chat widget
     ChatActions.init({
         classId: CLASS_ID,
         chatBody: body,
         linkify: ChatMentions.render,
         emptyId: 'gchatEmpty',
-        classes: { row: 'gchat-row', bubble: 'gchat-bubble', time: 'gchat-time', col: 'gchat-col' }
+        classes: {
+            row: 'gchat-row',
+            bubble: 'gchat-bubble',
+            time: 'gchat-time',
+            col: 'gchat-col'
+        }
     });
 
-    // NEW: unread (missed messages) badge on the chat bubble
     const fabBadge = document.createElement('b');
     fabBadge.className = 'gchat-fab-badge';
     fabBadge.hidden = true;
@@ -1648,22 +1705,24 @@ if (!$stream) {
     ChatUnread.onUpdate(function (u) {
         const n = isOpen ? 0 : (u.counts[CLASS_ID] || 0);
         const mn = isOpen ? 0 : ((u.mentions && u.mentions[CLASS_ID]) || 0);
+
         fabBadge.textContent = (mn > 0 ? '@' : '') + (n > 99 ? '99+' : n);
         fabBadge.classList.toggle('has-mention', mn > 0);
         fabBadge.title = mn > 0 ? 'You were mentioned' : '';
         fabBadge.hidden = n === 0;
     });
 
-    // only count messages as read while the chat is open and the tab is visible
     function markReadIfVisible() {
-        if (isOpen && lastId > 0 && !document.hidden) ChatUnread.markRead(CLASS_ID, lastId);
+        if (isOpen && lastId > 0 && !document.hidden) {
+            ChatUnread.markRead(CLASS_ID, lastId);
+        }
     }
+
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden) markReadIfVisible();
     });
 
     window.toggleClassChat = function () {
-
         isOpen = !isOpen;
 
         widget.classList.toggle('open', isOpen);
@@ -1676,11 +1735,9 @@ if (!$stream) {
         } else {
             stopPolling();
         }
-
     };
 
     function esc(s) {
-
         return String(s ?? '').replace(/[&<>"']/g, c => ({
             '&': '&amp;',
             '<': '&lt;',
@@ -1688,28 +1745,22 @@ if (!$stream) {
             '"': '&quot;',
             "'": '&#39;'
         }[c]));
-
     }
 
-    // Escape first, then turn http(s) URLs into clickable links
     function linkify(text) {
-
         return esc(text).replace(
             /(https?:\/\/[^\s<]+)/g,
             '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
         );
-
     }
 
     function fmtTime(raw) {
-
         const d = new Date(String(raw).replace(' ', 'T'));
 
         return d.toLocaleTimeString([], {
             hour: 'numeric',
             minute: '2-digit'
         });
-
     }
 
     function scrollBottom() {
@@ -1739,9 +1790,7 @@ if (!$stream) {
 
     const DEFAULT_IMGS = ['', 'default.png', 'default.jpg', 'default.jpeg', 'null'];
 
-    // Build a safe URL for a stored profile image value
     function profileSrc(value) {
-
         const raw = String(value || '').trim().replace(/\\/g, '/');
 
         if (raw.includes('..')) return '';
@@ -1750,13 +1799,11 @@ if (!$stream) {
 
         if (DEFAULT_IMGS.includes(name.toLowerCase())) return '';
 
-        // value already has a folder (e.g. "uploads/x.jpg" or "profiles/x.jpg")
         if (raw.includes('/')) {
             return encodeURI(raw.replace(/^\/+/, ''));
         }
 
         return 'uploads/' + encodeURIComponent(name);
-
     }
 
     function renderMsg(m) {
@@ -1775,16 +1822,15 @@ if (!$stream) {
         let content = '';
         const msg = (m.message || '').trim();
 
-        // New format: attachment columns
         if (m.attachment) {
             const url = 'uploads/' + encodeURI(m.attachment);
+
             content += (m.attachment_type === 'image')
                 ? imageHtml(url, m.attachment_name)
                 : fileHtml(url, m.attachment_name || 'File');
         }
 
-        // Old format: "[image:xxx]" / "[file:xxx]" stored in the message text
-        const oldImg  = msg.match(/^\[image:(.+)\]$/);
+        const oldImg = msg.match(/^\[image:(.+)\]$/);
         const oldFile = msg.match(/^\[file:(.+)\]$/);
 
         if (oldImg) {
@@ -1798,7 +1844,6 @@ if (!$stream) {
             content += `<div class="gchat-bubble">${ChatMentions.render(m.message, m.mentions)}</div>`;
         }
 
-        // NEW: deleted messages show a placeholder
         if (m.is_deleted) {
             content = '<div class="gchat-bubble msg-deleted"><i class="fa-solid fa-ban"></i> This message was deleted</div>';
         }
@@ -1813,7 +1858,6 @@ if (!$stream) {
             ${m.is_me ? avatar : ''}
         `;
 
-        // If a profile image fails to load, swap it for the user icon
         row.querySelectorAll('img.gchat-avatar').forEach(img => {
             img.addEventListener('error', () => {
                 const d = document.createElement('div');
@@ -1824,7 +1868,8 @@ if (!$stream) {
         });
 
         body.appendChild(row);
-        ChatActions.decorate(row, m);   // NEW: adds the ⋮ menu + "edited" tag
+        ChatActions.decorate(row, m);
+
         lastId = Math.max(lastId, Number(m.id));
     }
 
@@ -1847,50 +1892,36 @@ if (!$stream) {
             const d = await r.json();
 
             if (d.messages && d.messages.length) {
-
                 d.messages.forEach(renderMsg);
                 scrollBottom();
-                markReadIfVisible();   // NEW
-
+                markReadIfVisible();
             } else if (d.error) {
-
                 console.error('Chat poll error:', d.error);
-
             }
 
         } catch (e) {
-
             console.error('Chat poll:', e);
-
         } finally {
-
             polling = false;
-
         }
-
     }
 
-    // CHANGED: each tick also syncs edits / deletes made by other people
     async function tick() {
         await poll();
         await ChatActions.sync();
     }
 
     function startPolling() {
-
         tick();
 
         if (!timer) {
             timer = setInterval(tick, POLL_MS);
         }
-
     }
 
     function stopPolling() {
-
         clearInterval(timer);
         timer = null;
-
     }
 
     /* ATTACHMENT PICKING */
@@ -1900,14 +1931,10 @@ if (!$stream) {
         if (!file) return;
 
         if (file.size > MAX_BYTES) {
-
             alert('File is too large (max 10MB).');
-
             imgInput.value = '';
             fileInput.value = '';
-
             return;
-
         }
 
         pendingFile = file;
@@ -1922,47 +1949,31 @@ if (!$stream) {
         preview.innerHTML = '';
 
         if (kind === 'image') {
-
             const img = document.createElement('img');
-
             img.src = URL.createObjectURL(file);
-
             preview.appendChild(img);
-
         } else {
-
-            preview.insertAdjacentHTML(
-                'beforeend',
-                '<i class="fa-solid fa-file"></i>'
-            );
-
+            preview.insertAdjacentHTML('beforeend', '<i class="fa-solid fa-file"></i>');
         }
 
         const name = document.createElement('span');
-
         name.textContent = file.name;
 
         const x = document.createElement('button');
-
         x.type = 'button';
         x.className = 'gchat-preview-x';
         x.textContent = '×';
         x.onclick = clearPending;
 
         preview.append(name, x);
-
     }
 
     function clearPending() {
-
         pendingFile = null;
-
         imgInput.value = '';
         fileInput.value = '';
-
         preview.hidden = true;
         preview.innerHTML = '';
-
     }
 
     imgInput.addEventListener('change', () => {
@@ -2020,117 +2031,74 @@ if (!$stream) {
                 );
 
                 return;
-
             }
 
             if (d.success) {
-
                 input.value = '';
                 input.style.height = 'auto';
-
                 clearPending();
-
                 await poll();
-
             } else {
-
                 alert(d.error || 'Send failed');
-
             }
 
         } catch (e) {
-
             console.error('Chat send:', e);
-
             alert('Send failed: ' + e.message);
-
         } finally {
-
             sending = false;
-
             input.disabled = false;
             sendBtn.disabled = false;
-
             input.focus();
-
         }
-
     }
 
     sendBtn.addEventListener('click', sendMessage);
 
     input.addEventListener('keydown', e => {
-
         if (e.key === 'Enter' && !e.shiftKey) {
-
             e.preventDefault();
-
             sendMessage();
-
         }
-
     });
 
     input.addEventListener('input', () => {
-
         input.style.height = 'auto';
-
-        input.style.height =
-            Math.min(input.scrollHeight, 80) + 'px';
-
+        input.style.height = Math.min(input.scrollHeight, 80) + 'px';
     });
 
 })();
 </script>
 
-<!-- ==========================================
-     SIDEBAR JAVASCRIPT
-========================================== -->
-
+<!-- SIDEBAR JAVASCRIPT -->
 <script>
 
 function toggleSidebar() {
-
     if (window.innerWidth > 768) {
-
         document.getElementById('sidebar').classList.toggle('collapsed');
-
         document.getElementById('mainContent').classList.toggle('expanded');
-
     }
-
 }
 
 function mobileSidebar() {
-
     document.getElementById('sidebar').classList.toggle('show');
-
     document.getElementById('sidebarOverlay').classList.toggle('show');
-
     document.body.classList.toggle('no-scroll');
-
 }
 
 function closeMobileSidebar() {
-
     document.getElementById('sidebar').classList.remove('show');
-
     document.getElementById('sidebarOverlay').classList.remove('show');
-
     document.body.classList.remove('no-scroll');
-
 }
 
 window.addEventListener('resize', function () {
-
     if (window.innerWidth > 768) {
         closeMobileSidebar();
     }
-
 });
 
 function toggleStreamContent(e, headerEl) {
-
     if (e.target.closest('.dropdown')) return;
 
     const card = headerEl.closest('.announcement-card');
@@ -2138,23 +2106,17 @@ function toggleStreamContent(e, headerEl) {
     if (!card) return;
 
     const content = card.querySelector('.stream-collapsible');
-
     const icon = headerEl.querySelector('.stream-toggle-icon');
 
     if (!content || !icon) return;
 
     content.classList.toggle('show');
-
     icon.classList.toggle('rotated');
-
 }
 
 </script>
 
-<!-- ==========================================
-     ANNOUNCEMENT ATTACHMENTS JAVASCRIPT
-========================================== -->
-
+<!-- ANNOUNCEMENT ATTACHMENTS JAVASCRIPT -->
 <script>
 
 (function () {
@@ -2186,7 +2148,6 @@ function toggleStreamContent(e, headerEl) {
     }
 
     function showMsg(text) {
-
         msgEl.textContent = text;
 
         clearTimeout(msgTimer);
@@ -2194,47 +2155,34 @@ function toggleStreamContent(e, headerEl) {
         msgTimer = setTimeout(() => {
             msgEl.textContent = '';
         }, 4000);
-
     }
 
     function iconFor(e) {
-
         if (e === 'pdf') return 'fa-file-pdf';
-
         if (['doc', 'docx'].includes(e)) return 'fa-file-word';
-
         if (['ppt', 'pptx'].includes(e)) return 'fa-file-powerpoint';
-
         if (['xls', 'xlsx', 'csv'].includes(e)) return 'fa-file-excel';
-
         if (['zip', 'rar'].includes(e)) return 'fa-file-zipper';
 
         return 'fa-file';
-
     }
 
     function syncFileInput() {
-
         const dt = new DataTransfer();
 
         items.forEach(it => {
-
             if (it.kind === 'file') {
                 dt.items.add(it.file);
             }
-
         });
 
         realInput.files = dt.files;
-
     }
 
     function syncLinkInputs() {
-
         linksHidden.innerHTML = '';
 
         items.forEach(it => {
-
             if (it.kind !== 'link') return;
 
             const h = document.createElement('input');
@@ -2244,9 +2192,7 @@ function toggleStreamContent(e, headerEl) {
             h.value = it.url;
 
             linksHidden.appendChild(h);
-
         });
-
     }
 
     function render() {
@@ -2256,15 +2202,11 @@ function toggleStreamContent(e, headerEl) {
         items.forEach((it, index) => {
 
             const chip = document.createElement('div');
-
             chip.className = 'attach-chip';
 
             let label;
 
-            if (
-                it.kind === 'file' &&
-                IMG_EXT.includes(ext(it.file.name))
-            ) {
+            if (it.kind === 'file' && IMG_EXT.includes(ext(it.file.name))) {
 
                 const img = document.createElement('img');
 
@@ -2273,7 +2215,6 @@ function toggleStreamContent(e, headerEl) {
                 img.alt = '';
 
                 chip.appendChild(img);
-
                 label = it.file.name;
 
             } else {
@@ -2292,7 +2233,6 @@ function toggleStreamContent(e, headerEl) {
                 label = it.kind === 'link'
                     ? it.url
                     : it.file.name;
-
             }
 
             const name = document.createElement('span');
@@ -2313,7 +2253,6 @@ function toggleStreamContent(e, headerEl) {
             rm.addEventListener('click', () => removeItem(index));
 
             chip.appendChild(rm);
-
             listEl.appendChild(chip);
 
         });
@@ -2327,11 +2266,9 @@ function toggleStreamContent(e, headerEl) {
 
         syncFileInput();
         syncLinkInputs();
-
     }
 
     function removeItem(index) {
-
         const it = items[index];
 
         if (it && it.kind === 'file') {
@@ -2339,9 +2276,7 @@ function toggleStreamContent(e, headerEl) {
         }
 
         items.splice(index, 1);
-
         render();
-
     }
 
     function addFiles(fileList) {
@@ -2351,22 +2286,16 @@ function toggleStreamContent(e, headerEl) {
         Array.from(fileList).forEach(f => {
 
             if (total() >= MAX_ITEMS) {
-
                 limitHit = true;
-
                 return;
-
             }
 
             if (f.size > MAX_MB * 1024 * 1024) {
-
                 showMsg(
                     '"' + f.name + '" is larger than ' +
                     MAX_MB + ' MB and was skipped.'
                 );
-
                 return;
-
             }
 
             const duplicate = items.some(it =>
@@ -2387,32 +2316,23 @@ function toggleStreamContent(e, headerEl) {
         });
 
         if (limitHit) {
-
             showMsg(
                 'You can attach up to ' + MAX_ITEMS +
                 ' items (images, files and links combined).'
             );
-
         }
 
         render();
-
     }
 
     pickImages.addEventListener('change', () => {
-
         addFiles(pickImages.files);
-
         pickImages.value = '';
-
     });
 
     pickFiles.addEventListener('change', () => {
-
         addFiles(pickFiles.files);
-
         pickFiles.value = '';
-
     });
 
     /* LINK MODAL */
@@ -2422,40 +2342,31 @@ function toggleStreamContent(e, headerEl) {
         const errorBox = document.getElementById('announceLinkError');
 
         document.getElementById('announceLinkInput').value = '';
-
         errorBox.textContent = '';
 
         if (total() >= MAX_ITEMS) {
-
             showMsg(
                 'You can attach up to ' + MAX_ITEMS +
                 ' items (images, files and links combined).'
             );
-
             return;
-
         }
 
         bootstrap.Modal.getOrCreateInstance(
             document.getElementById('linkModal')
         ).show();
-
     };
 
     window.saveAnnounceLink = function () {
 
         const input = document.getElementById('announceLinkInput');
-
         const errorBox = document.getElementById('announceLinkError');
 
         let link = input.value.trim();
 
         if (!link) {
-
             errorBox.textContent = 'Please enter a link.';
-
             return;
-
         }
 
         if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(link)) {
@@ -2465,44 +2376,25 @@ function toggleStreamContent(e, headerEl) {
         let parsed;
 
         try {
-
             parsed = new URL(link);
-
         } catch (e) {
-
             errorBox.textContent = 'Please enter a valid link.';
-
             return;
-
         }
 
-        if (
-            parsed.protocol !== 'http:' &&
-            parsed.protocol !== 'https:'
-        ) {
-
-            errorBox.textContent =
-                'Only http:// and https:// links are allowed.';
-
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            errorBox.textContent = 'Only http:// and https:// links are allowed.';
             return;
-
         }
 
         if (total() >= MAX_ITEMS) {
-
-            errorBox.textContent =
-                'You can attach up to ' + MAX_ITEMS + ' items.';
-
+            errorBox.textContent = 'You can attach up to ' + MAX_ITEMS + ' items.';
             return;
-
         }
 
         if (items.some(it => it.kind === 'link' && it.url === link)) {
-
             errorBox.textContent = 'This link is already attached.';
-
             return;
-
         }
 
         items.push({
@@ -2515,46 +2407,31 @@ function toggleStreamContent(e, headerEl) {
         bootstrap.Modal.getOrCreateInstance(
             document.getElementById('linkModal')
         ).hide();
-
     };
 
     document.getElementById('announceLinkInput')
         .addEventListener('keydown', function (e) {
-
             if (e.key === 'Enter') {
-
                 e.preventDefault();
-
                 window.saveAnnounceLink();
-
             }
-
         });
 
     document.getElementById('linkModal')
         .addEventListener('shown.bs.modal', function () {
-
             document.getElementById('announceLinkInput').focus();
-
         });
 
     /* PREVENT EMPTY ANNOUNCEMENTS */
 
     form.addEventListener('submit', function (e) {
-
-        if (
-            textArea.value.trim() === '' &&
-            total() === 0
-        ) {
-
+        if (textArea.value.trim() === '' && total() === 0) {
             e.preventDefault();
 
             showMsg(
                 'Write something or attach an image, file or link first.'
             );
-
         }
-
     });
 
     render();
@@ -2563,96 +2440,66 @@ function toggleStreamContent(e, headerEl) {
 
 </script>
 
-<!-- ==========================================
-     GOOGLE MEET JAVASCRIPT
-========================================== -->
-
+<!-- GOOGLE MEET JAVASCRIPT -->
 <script>
 
 const CLASS_ID_FOR_MEET = <?php echo json_encode($id); ?>;
 
 function openMeetModal() {
-
     const modalEl = document.getElementById('meetModal');
-
     const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-
     modal.show();
-
 }
 
 async function saveMeetLink() {
 
     const input = document.getElementById('meetLinkInput');
-
     const errorBox = document.getElementById('meetLinkError');
 
     const link = input.value.trim();
 
     errorBox.textContent = '';
 
-    const pattern =
-        /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i;
+    const pattern = /^https:\/\/meet\.google\.com\/[a-z0-9-]+$/i;
 
     if (!pattern.test(link)) {
-
         errorBox.textContent =
             'Invalid link format. It should look like https://meet.google.com/xxx-xxxx-xxx';
-
         return;
-
     }
 
     const saveBtn = document.getElementById('saveMeetBtn');
 
     saveBtn.disabled = true;
-
     saveBtn.textContent = 'Saving...';
 
     try {
 
         const res = await fetch('save_meet_link.php', {
-
             method: 'POST',
-
             body: new URLSearchParams({
-
                 class_id: CLASS_ID_FOR_MEET,
-
                 meet_link: link
-
             })
-
         });
 
         const data = await res.json();
 
         if (data.success) {
-
             location.reload();
-
         } else {
-
-            errorBox.textContent =
-                data.error || 'Save failed. Please try again.';
-
+            errorBox.textContent = data.error || 'Save failed. Please try again.';
             saveBtn.disabled = false;
-
             saveBtn.textContent = 'Save';
-
         }
 
     } catch (e) {
 
-        errorBox.textContent =
-            'Network error. Please try again.';
-
+        errorBox.textContent = 'Network error. Please try again.';
         saveBtn.disabled = false;
-
         saveBtn.textContent = 'Save';
 
     }
-
 }
 
 </script>

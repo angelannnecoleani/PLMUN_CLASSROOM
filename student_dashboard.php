@@ -1,14 +1,16 @@
-
 <?php
 session_start();
-include 'database.php';
+require_once 'database.php';
 
-if (!isset($_SESSION['user_id'])) {
+if (
+    empty($_SESSION['user_id']) ||
+    ($_SESSION['role'] ?? '') !== 'student'
+) {
     header("Location: login.php");
     exit();
 }
 
-$student_id = (int)$_SESSION['user_id'];
+$student_id = (int) $_SESSION['user_id'];
 
 /* =========================================
    HELPER FUNCTION
@@ -22,7 +24,14 @@ function e($value) {
    USER INFORMATION
 ========================================= */
 
-$userStmt = mysqli_prepare($conn, "SELECT * FROM users WHERE id = ?");
+$userStmt = mysqli_prepare(
+    $conn,
+    "SELECT * FROM users WHERE id = ?"
+);
+
+if (!$userStmt) {
+    die("Database error: " . e(mysqli_error($conn)));
+}
 
 mysqli_stmt_bind_param($userStmt, "i", $student_id);
 mysqli_stmt_execute($userStmt);
@@ -32,19 +41,15 @@ $user = mysqli_fetch_assoc($userResult) ?: [];
 
 mysqli_stmt_close($userStmt);
 
-
 /* =========================================
    PROFILE IMAGE
 ========================================= */
 
-// Default state: show user icon
 $profileImageFile = '';
 $hasProfileImage = false;
 
-// Check the user's saved profile image
 $profileImageFile = trim((string)($user['profile_image'] ?? ''));
 
-// Filenames that should be treated as no profile picture
 $defaultImages = [
     '',
     'null',
@@ -59,28 +64,22 @@ $defaultImages = [
 
 if ($profileImageFile !== '') {
 
-    // Prevent directory traversal
     $safeName = basename($profileImageFile);
 
     $imagePath = __DIR__ . '/uploads/' . $safeName;
 
-    // Check if the image is valid and actually exists
     if (
         !in_array(strtolower($safeName), $defaultImages, true) &&
         is_file($imagePath)
     ) {
-
         $profileImageFile = $safeName;
         $hasProfileImage = true;
-
     }
 }
 
-// If no valid image exists, show the user icon
 if (!$hasProfileImage) {
     $profileImageFile = '';
 }
-
 
 /* =========================================
    SEARCH
@@ -90,36 +89,85 @@ $search = trim($_GET['search'] ?? '');
 
 /* =========================================
    MY CLASSES
+   Primary instructor + co-instructors
 ========================================= */
 
 $myClasses = [];
 
 $myClassesSql = "
     SELECT
-        classes.*,
-        COALESCE(users.name, 'No instructor assigned yet') AS teacher_name
-    FROM class_students
-    INNER JOIN classes
-        ON class_students.class_id = classes.id
-    LEFT JOIN users
-        ON classes.teacher_id = users.id
-    WHERE class_students.student_id = ?
-    AND class_students.archived = 0
+        c.*,
+
+        COALESCE(
+            teacher.name,
+            'No instructor assigned yet'
+        ) AS teacher_name,
+
+        COALESCE(
+            co.co_instructor_names,
+            ''
+        ) AS co_instructor_names
+
+    FROM class_students cs
+
+    INNER JOIN classes c
+        ON cs.class_id = c.id
+
+    LEFT JOIN users AS teacher
+        ON c.teacher_id = teacher.id
+
+    LEFT JOIN (
+
+        SELECT
+            ci.class_id,
+
+            GROUP_CONCAT(
+                DISTINCT u.name
+                ORDER BY u.name ASC
+                SEPARATOR ', '
+            ) AS co_instructor_names
+
+        FROM class_instructors ci
+
+        INNER JOIN classes c2
+            ON ci.class_id = c2.id
+
+        INNER JOIN users u
+            ON ci.teacher_id = u.id
+
+        WHERE
+            c2.teacher_id IS NULL
+            OR ci.teacher_id <> c2.teacher_id
+
+        GROUP BY ci.class_id
+
+    ) AS co
+        ON co.class_id = c.id
+
+    WHERE cs.student_id = ?
+
+      AND (
+          cs.archived = 0
+          OR cs.archived IS NULL
+      )
 ";
 
 if ($search !== '') {
 
     $myClassesSql .= "
         AND (
-            classes.class_name LIKE ?
-            OR classes.program LIKE ?
-            OR classes.section LIKE ?
-            OR users.name LIKE ?
+            c.class_name LIKE ?
+            OR c.program LIKE ?
+            OR c.section LIKE ?
+            OR teacher.name LIKE ?
+            OR co.co_instructor_names LIKE ?
         )
     ";
 }
 
-$myClassesSql .= " ORDER BY class_students.joined_at DESC";
+$myClassesSql .= "
+    ORDER BY cs.joined_at DESC
+";
 
 $myClassesStmt = mysqli_prepare($conn, $myClassesSql);
 
@@ -133,8 +181,9 @@ if ($search !== '') {
 
     mysqli_stmt_bind_param(
         $myClassesStmt,
-        "issss",
+        "isssss",
         $student_id,
+        $searchTerm,
         $searchTerm,
         $searchTerm,
         $searchTerm,
@@ -148,7 +197,6 @@ if ($search !== '') {
         "i",
         $student_id
     );
-
 }
 
 mysqli_stmt_execute($myClassesStmt);
@@ -235,6 +283,27 @@ function getClassColor($classId, $colors) {
             color: inherit;
         }
 
+        .teacher-name {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 12px;
+        }
+
+        /* CO-INSTRUCTOR DISPLAY */
+
+        .co-instructor-name {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: -8px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+
+        .co-instructor-name i {
+            color: #3f87b5;
+        }
+
         .empty-class-message {
             background: #fff;
             border: 1px dashed #ccc;
@@ -282,7 +351,6 @@ function getClassColor($classId, $colors) {
             <i class="fa-solid fa-bars"></i>
 
         </button>
-        
 
     </div>
 
@@ -462,8 +530,6 @@ function getClassColor($classId, $colors) {
 
             <!-- PROFILE -->
 
-            
-
             <a href="profile.php" class="profile-icon" aria-label="My profile">
 
                 <?php if ($hasProfileImage): ?>
@@ -508,7 +574,7 @@ function getClassColor($classId, $colors) {
                             type="text"
                             name="search"
                             class="form-control"
-                            placeholder="Search your classes "
+                            placeholder="Search your classes"
                             value="<?= e($search) ?>"
                         >
 
@@ -606,12 +672,35 @@ function getClassColor($classId, $colors) {
                                     </h3>
 
 
+                                    <!-- PRIMARY INSTRUCTOR -->
+
                                     <p class="teacher-name">
+
+                                        <i class="fa-solid fa-chalkboard-user me-1"></i>
 
                                         <?= e($class['teacher_name']) ?>
 
                                     </p>
 
+
+                                    <!-- CO-INSTRUCTORS -->
+
+                                    <?php if (!empty($class['co_instructor_names'])): ?>
+
+                                        <p class="co-instructor-name">
+
+                                            <i class="fa-solid fa-user-group me-1"></i>
+
+                                            Co-Instructor:
+
+                                            <?= e($class['co_instructor_names']) ?>
+
+                                        </p>
+
+                                    <?php endif; ?>
+
+
+                                    <!-- PROGRAM -->
 
                                     <p class="program-name">
 
@@ -622,6 +711,8 @@ function getClassColor($classId, $colors) {
                                     </p>
 
 
+                                    <!-- SECTION -->
+
                                     <p>
 
                                         <i class="fa-solid fa-users me-1"></i>
@@ -631,6 +722,8 @@ function getClassColor($classId, $colors) {
                                     </p>
 
 
+                                    <!-- SCHEDULE -->
+
                                     <p>
 
                                         <i class="fa-regular fa-clock me-1"></i>
@@ -639,6 +732,8 @@ function getClassColor($classId, $colors) {
 
                                     </p>
 
+
+                                    <!-- ROOM -->
 
                                     <p>
 
@@ -1012,8 +1107,6 @@ function closeMobileSidebar() {
 
 }
 
-/* Close sidebar when navigation link is clicked */
-
 document.querySelectorAll('.sidebar a').forEach(function(a) {
 
     a.addEventListener('click', function() {
@@ -1026,11 +1119,7 @@ document.querySelectorAll('.sidebar a').forEach(function(a) {
 
 });
 
-/* Close sidebar using overlay */
-
 overlayEl.addEventListener('click', closeMobileSidebar);
-
-/* Close sidebar using Escape */
 
 document.addEventListener('keydown', function(event) {
 
@@ -1039,8 +1128,6 @@ document.addEventListener('keydown', function(event) {
     }
 
 });
-
-/* Handle screen resizing */
 
 window.addEventListener('resize', function() {
 
@@ -1061,7 +1148,6 @@ const classCodeInput = document.getElementById('classCodeInput');
 
 const joinClassError = document.getElementById('joinClassError');
 
-
 joinClassModal.addEventListener('show.bs.modal', function() {
 
     joinClassError.classList.add('d-none');
@@ -1071,7 +1157,6 @@ joinClassModal.addEventListener('show.bs.modal', function() {
     classCodeInput.value = '';
 
 });
-
 
 document.getElementById('joinClassBtn').addEventListener('click', function() {
 
@@ -1311,7 +1396,6 @@ const leaveClassModal = new bootstrap.Modal(
     document.getElementById('leaveClassModal')
 );
 
-
 document.querySelectorAll('.leave-class-btn').forEach(function(btn) {
 
     btn.addEventListener('click', function() {
@@ -1329,7 +1413,6 @@ document.querySelectorAll('.leave-class-btn').forEach(function(btn) {
     });
 
 });
-
 
 document.getElementById('confirmLeaveBtn').addEventListener('click', function() {
 

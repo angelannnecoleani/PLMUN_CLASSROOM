@@ -1,85 +1,297 @@
 <?php
 session_start();
-include 'database.php';
 
-// Returns true only if the profile image is real and the file exists on disk
-function hasValidProfileImage($file){
-    if(empty($file)) return false;
-    if(in_array(strtolower($file), ['default.png', 'default.jpg', 'default.jpeg', 'null'])) return false;
-    return file_exists(__DIR__ . '/uploads/' . basename($file));
+require_once 'database.php';
+require_once 'auth_helpers.php';
+
+/* =========================================
+   1. PROFILE IMAGE VALIDATION
+========================================= */
+
+function hasValidProfileImage($file) {
+
+    if (empty($file)) {
+        return false;
+    }
+
+    if (in_array(strtolower($file), [
+        'default.png',
+        'default.jpg',
+        'default.jpeg',
+        'null'
+    ], true)) {
+        return false;
+    }
+
+    return is_file(
+        __DIR__ . '/uploads/' . basename($file)
+    );
 }
 
-if(!isset($_GET['id'])) die("Class not found");
-$class_id = intval($_GET['id']);
+/* =========================================
+   2. LOGIN AND ROLE VALIDATION
+========================================= */
 
-$teacher_id = $_SESSION['user_id'];
+if (empty($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
 
-$userQuery = mysqli_query($conn, "SELECT * FROM users WHERE id='$teacher_id'");
-$user = mysqli_fetch_assoc($userQuery);
+$user_id = (int) $_SESSION['user_id'];
+$role = $_SESSION['role'] ?? '';
 
-$classStmt = mysqli_prepare($conn, "SELECT * FROM classes WHERE id = ? AND teacher_id = ?");
-mysqli_stmt_bind_param($classStmt, "ii", $class_id, $teacher_id);
+if (!in_array($role, ['teacher', 'program_chair'], true)) {
+    header("Location: login.php");
+    exit();
+}
+
+/* =========================================
+   3. VALIDATE CLASS ID
+========================================= */
+
+if (!isset($_GET['id'])) {
+    die("Class not found.");
+}
+
+$class_id = (int) $_GET['id'];
+
+if ($class_id <= 0) {
+    die("Invalid class ID.");
+}
+
+/* =========================================
+   4. VERIFY CLASS ACCESS
+========================================= */
+
+if ($role === 'teacher') {
+
+    // Primary teacher or assigned co-instructor
+    $classStmt = mysqli_prepare(
+        $conn,
+        "SELECT *
+         FROM classes
+         WHERE id = ?
+         AND (
+             teacher_id = ?
+             OR EXISTS (
+                 SELECT 1
+                 FROM class_instructors ci
+                 WHERE ci.class_id = classes.id
+                 AND ci.teacher_id = ?
+             )
+         )
+         LIMIT 1"
+    );
+
+    if (!$classStmt) {
+        die("Database error: " . mysqli_error($conn));
+    }
+
+    mysqli_stmt_bind_param(
+        $classStmt,
+        "iii",
+        $class_id,
+        $user_id,
+        $user_id
+    );
+
+} else {
+
+    // Program chair: use existing access helper
+    if (!getClassAccess($conn, $class_id, $user_id, $role)) {
+        die("Access denied. You do not have permission to view this class.");
+    }
+
+    $classStmt = mysqli_prepare(
+        $conn,
+        "SELECT *
+         FROM classes
+         WHERE id = ?
+         LIMIT 1"
+    );
+
+    if (!$classStmt) {
+        die("Database error: " . mysqli_error($conn));
+    }
+
+    mysqli_stmt_bind_param(
+        $classStmt,
+        "i",
+        $class_id
+    );
+}
+
 mysqli_stmt_execute($classStmt);
-$class = mysqli_fetch_assoc(mysqli_stmt_get_result($classStmt));
-if(!$class) die("Class not found");
 
-// Sort order
-$sort = isset($_GET['sort']) && $_GET['sort'] === 'first' ? 'first' : 'last';
-$order_sql = $sort === 'first' ? 'ORDER BY u.name ASC' : 'ORDER BY u.name ASC';
+$class = mysqli_fetch_assoc(
+    mysqli_stmt_get_result($classStmt)
+);
 
-// Fetch all students in this class
-$studentsStmt = mysqli_prepare($conn, "
-    SELECT u.id, u.name, u.profile_image
+mysqli_stmt_close($classStmt);
+
+if (!$class) {
+    die("Class not found or access denied.");
+}
+
+/* =========================================
+   5. GET LOGGED-IN USER
+========================================= */
+
+$userStmt = mysqli_prepare(
+    $conn,
+    "SELECT *
+     FROM users
+     WHERE id = ?
+     LIMIT 1"
+);
+
+mysqli_stmt_bind_param($userStmt, "i", $user_id);
+mysqli_stmt_execute($userStmt);
+
+$user = mysqli_fetch_assoc(
+    mysqli_stmt_get_result($userStmt)
+) ?: [];
+
+mysqli_stmt_close($userStmt);
+
+/* =========================================
+   6. SORT ORDER
+========================================= */
+
+$sort = (
+    isset($_GET['sort']) &&
+    $_GET['sort'] === 'first'
+) ? 'first' : 'last';
+
+// Use a whitelist for the SQL ORDER BY expression.
+if ($sort === 'first') {
+    $order_sql = "ORDER BY SUBSTRING_INDEX(u.name, ' ', 1) ASC, u.name ASC";
+} else {
+    $order_sql = "ORDER BY SUBSTRING_INDEX(u.name, ' ', -1) ASC, u.name ASC";
+}
+
+/* =========================================
+   7. FETCH STUDENTS
+========================================= */
+
+$studentsSql = "
+    SELECT
+        u.id,
+        u.name,
+        u.profile_image
     FROM class_students cs
-    INNER JOIN users u ON cs.student_id = u.id
+    INNER JOIN users u
+        ON cs.student_id = u.id
     WHERE cs.class_id = ?
-    ORDER BY u.name ASC
-");
+    AND (cs.archived = 0 OR cs.archived IS NULL)
+    $order_sql
+";
+
+$studentsStmt = mysqli_prepare($conn, $studentsSql);
+
+if (!$studentsStmt) {
+    die("Unable to load students: " . mysqli_error($conn));
+}
+
 mysqli_stmt_bind_param($studentsStmt, "i", $class_id);
 mysqli_stmt_execute($studentsStmt);
-$studentsResult = mysqli_stmt_get_result($studentsStmt);
-$students = [];
-while($s = mysqli_fetch_assoc($studentsResult)) $students[] = $s;
 
-// Fetch all assessments for this class
-$assessStmt = mysqli_prepare($conn, "
-    SELECT id, title, points, type
-    FROM assessments
-    WHERE class_id = ?
-    ORDER BY id ASC
-");
+$studentsResult = mysqli_stmt_get_result($studentsStmt);
+
+$students = [];
+
+while ($s = mysqli_fetch_assoc($studentsResult)) {
+    $students[] = $s;
+}
+
+mysqli_stmt_close($studentsStmt);
+
+/* =========================================
+   8. FETCH ASSESSMENTS
+========================================= */
+
+$assessStmt = mysqli_prepare(
+    $conn,
+    "SELECT id, title, points, type
+     FROM assessments
+     WHERE class_id = ?
+     ORDER BY id ASC"
+);
+
 mysqli_stmt_bind_param($assessStmt, "i", $class_id);
 mysqli_stmt_execute($assessStmt);
-$assessResult = mysqli_stmt_get_result($assessStmt);
-$assessments = [];
-while($a = mysqli_fetch_assoc($assessResult)) $assessments[] = $a;
 
-// Fetch all grades: [student_id][assessment_id] = grade
-$gradesStmt = mysqli_prepare($conn, "
-    SELECT s.student_id, s.assessment_id, s.grade
-    FROM submissions s
-    INNER JOIN assessments a ON s.assessment_id = a.id
-    WHERE a.class_id = ?
-");
+$assessResult = mysqli_stmt_get_result($assessStmt);
+
+$assessments = [];
+
+while ($a = mysqli_fetch_assoc($assessResult)) {
+    $assessments[] = $a;
+}
+
+mysqli_stmt_close($assessStmt);
+
+/* =========================================
+   9. FETCH GRADES
+========================================= */
+
+$gradesStmt = mysqli_prepare(
+    $conn,
+    "SELECT
+        s.student_id,
+        s.assessment_id,
+        s.grade
+     FROM submissions s
+     INNER JOIN assessments a
+        ON s.assessment_id = a.id
+     WHERE a.class_id = ?"
+);
+
 mysqli_stmt_bind_param($gradesStmt, "i", $class_id);
 mysqli_stmt_execute($gradesStmt);
+
 $gradesResult = mysqli_stmt_get_result($gradesStmt);
+
 $grades = [];
-while($g = mysqli_fetch_assoc($gradesResult)){
+
+while ($g = mysqli_fetch_assoc($gradesResult)) {
+
     $grades[$g['student_id']][$g['assessment_id']] = $g['grade'];
+
 }
 
-// Compute class averages per assessment
+mysqli_stmt_close($gradesStmt);
+
+/* =========================================
+   10. COMPUTE CLASS AVERAGES
+========================================= */
+
 $averages = [];
-foreach($assessments as $a){
-    $total = 0; $count = 0;
-    foreach($students as $s){
-        $g = $grades[$s['id']][$a['id']] ?? null;
-        if($g !== null){ $total += $g; $count++; }
+
+foreach ($assessments as $a) {
+
+    $total = 0;
+    $count = 0;
+
+    foreach ($students as $s) {
+
+        $grade = $grades[$s['id']][$a['id']] ?? null;
+
+        if ($grade !== null && $grade !== '') {
+
+            $total += (float) $grade;
+            $count++;
+
+        }
     }
-    $averages[$a['id']] = $count > 0 ? round($total / $count, 1) : null;
+
+    $averages[$a['id']] = $count > 0
+        ? round($total / $count, 1)
+        : null;
 }
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -492,7 +704,7 @@ foreach($assessments as $a){
         <li><a href="teacher_to_review.php"><i class="fa-solid fa-clipboard-list"></i><span>To Review</span></a></li>
         <li><a href="teacher_messages.php"><i class="fa-regular fa-message"></i><span>Messages</span></a></li>
         <li><a href="teacher_performance.php"><i class="fa-solid fa-chart-pie"></i><span>Performance</span></a></li>
-        <li><a href="teacher_resources.php"><i class="fa-solid fa-book-open"></i><span>Resources</span></a></li>
+
     </ul>
     <div class="logout-btn">
         <a href="logout.php"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>
@@ -532,7 +744,7 @@ foreach($assessments as $a){
     <div class="class-nav">
         <a href="teacher_class.php?id=<?php echo $class_id; ?>">Stream</a>
         <a href="teacher_assessment.php?id=<?php echo $class_id; ?>">Assessments</a>
-        <a href="teacher_materials.php?id=<?php echo $class_id; ?>">Materials</a>
+        <a href="teacher_material.php?id=<?php echo $class_id; ?>">Materials</a>
         <a href="teacher_people.php?id=<?php echo $class_id; ?>">People</a>
         <a href="teacher_grades.php?id=<?php echo $class_id; ?>" class="nav-active">Grades</a>
     </div>
