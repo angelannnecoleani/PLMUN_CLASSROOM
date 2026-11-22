@@ -966,12 +966,18 @@ if ($permissionResult) {
 
 <body>
 
+<!-- =========================================
+     SIDEBAR
+========================================= -->
+
 <div class="admin-sidebar" id="adminSidebar">
 
+    <!-- SIDEBAR HEADER -->
     <div class="admin-sidebar-header">
-        <h1>Admin</h1>
+        <h1>ADMIN</h1>
     </div>
 
+    <!-- SIDEBAR MENU -->
     <ul class="admin-menu">
 
         <li>
@@ -1004,27 +1010,35 @@ if ($permissionResult) {
 
         <li>
             <a href="admin_reports.php">
-                <i class="fa-solid fa-wave-square"></i>
+                <i class="fa-solid fa-chart-line"></i>
                 <span>Reports &amp; Analytics</span>
             </a>
         </li>
 
         <li>
-            <a href="admin_logs.php">
-                <i class="fa-regular fa-clock"></i>
-                <span>Logs &amp; Activity</span>
-            </a>
-        </li>
-
-        <li>
-            <a href="admin_security.php">
+            <a href="admin_backup_security.php">
                 <i class="fa-solid fa-shield-halved"></i>
                 <span>Backup &amp; Security</span>
             </a>
         </li>
 
+        <li>
+            <a href="security_overview.php">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>Security Overview</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="audit_logs.php">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Audit Logs</span>
+            </a>
+        </li>
+
     </ul>
 
+    <!-- LOGOUT -->
     <div class="admin-logout">
         <a href="logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -1034,7 +1048,11 @@ if ($permissionResult) {
 
 </div>
 
-<div class="admin-overlay" id="adminOverlay" onclick="closeAdminSidebar()"></div>
+<!-- MOBILE SIDEBAR OVERLAY -->
+<div class="admin-overlay"
+     id="adminOverlay"
+     onclick="closeAdminSidebar()">
+</div>
 
 <div class="admin-main">
 
@@ -1159,76 +1177,7 @@ if ($permissionResult) {
         </div>
 
         <!-- ROLE PERMISSIONS -->
-        <form method="POST" class="permissions-section">
-
-            <input
-                type="hidden"
-                name="csrf_token"
-                value="<?= e($csrf_token); ?>"
-            >
-
-            <input
-                type="hidden"
-                name="action"
-                value="update_permissions"
-            >
-
-            <div class="permissions-header">
-
-                <h3>Role Permissions</h3>
-
-                <button type="submit" class="save-permissions-btn">
-                    Save Permissions
-                </button>
-
-            </div>
-
-            <div class="permission-grid">
-
-                <?php foreach ($permissionLabels as $roleKey => $rolePermissions): ?>
-
-                    <div class="permission-card">
-
-                        <div class="permission-card-header">
-                            <h4>
-                                <?= e($roleLabels[$roleKey] ?? ucfirst($roleKey)); ?>
-                            </h4>
-                        </div>
-
-                        <div class="permission-list">
-
-                            <?php foreach ($rolePermissions as $permission => $label): ?>
-
-                                <?php
-                                $checked = isset($permissionState[$roleKey][$permission])
-                                    ? (int)$permissionState[$roleKey][$permission] === 1
-                                    : false;
-                                ?>
-
-                                <label class="permission-item">
-
-                                    <input
-                                        type="checkbox"
-                                        name="<?= e($roleKey . '_' . $permission); ?>"
-                                        value="1"
-                                        <?= $checked ? 'checked' : ''; ?>
-                                    >
-
-                                    <span><?= e($label); ?></span>
-
-                                </label>
-
-                            <?php endforeach; ?>
-
-                        </div>
-
-                    </div>
-
-                <?php endforeach; ?>
-
-            </div>
-
-        </form>
+        
 
         <!-- ALL USERS -->
         <section class="all-users-section">

@@ -545,10 +545,12 @@ $hasProfileImage = (
 
 <div class="admin-sidebar" id="adminSidebar">
 
+    <!-- SIDEBAR HEADER -->
     <div class="admin-sidebar-header">
         <h1>ADMIN</h1>
     </div>
 
+    <!-- SIDEBAR MENU -->
     <ul class="admin-menu">
 
         <li>
@@ -581,27 +583,35 @@ $hasProfileImage = (
 
         <li>
             <a href="admin_reports.php">
-                <i class="fa-solid fa-wave-square"></i>
+                <i class="fa-solid fa-chart-line"></i>
                 <span>Reports &amp; Analytics</span>
             </a>
         </li>
 
         <li>
-            <a href="admin_logs.php">
-                <i class="fa-regular fa-clock"></i>
-                <span>Logs &amp; Activity</span>
+            <a href="admin_backup_security.php">
+                <i class="fa-solid fa-database"></i>
+                <span>Backup</span>
             </a>
         </li>
 
         <li>
-            <a href="admin_security.php">
+            <a href="security_overview.php">
                 <i class="fa-solid fa-shield-halved"></i>
-                <span>Backup &amp; Security</span>
+                <span>Security Overview</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="audit_logs.php">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Audit Logs</span>
             </a>
         </li>
 
     </ul>
 
+    <!-- LOGOUT -->
     <div class="admin-logout">
         <a href="logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -611,11 +621,11 @@ $hasProfileImage = (
 
 </div>
 
-<!-- MOBILE OVERLAY -->
-
+<!-- MOBILE SIDEBAR OVERLAY -->
 <div class="admin-overlay"
      id="adminOverlay"
-     onclick="closeAdminSidebar()"></div>
+     onclick="closeAdminSidebar()">
+</div>
 
 
 <!-- =========================================

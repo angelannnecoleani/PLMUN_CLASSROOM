@@ -866,17 +866,18 @@ $exportUrl = 'admin_reports.php?' .
 </head>
 
 <body>
-
-<!-- =========================================================
+<!-- =========================================
      SIDEBAR
-========================================================= -->
+========================================= -->
 
 <div class="admin-sidebar" id="adminSidebar">
 
+    <!-- SIDEBAR HEADER -->
     <div class="admin-sidebar-header">
-        <h1>Admin</h1>
+        <h1>ADMIN</h1>
     </div>
 
+    <!-- SIDEBAR MENU -->
     <ul class="admin-menu">
 
         <li>
@@ -888,7 +889,7 @@ $exportUrl = 'admin_reports.php?' .
 
         <li>
             <a href="admin_users.php">
-                <i class="fa-solid fa-user"></i>
+                <i class="fa-solid fa-user-group"></i>
                 <span>User Management</span>
             </a>
         </li>
@@ -909,27 +910,35 @@ $exportUrl = 'admin_reports.php?' .
 
         <li>
             <a href="admin_reports.php" class="active">
-                <i class="fa-solid fa-wave-square"></i>
-                <span>Reports & Analytics</span>
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Reports &amp; Analytics</span>
             </a>
         </li>
 
         <li>
-            <a href="admin_logs.php">
-                <i class="fa-regular fa-clock"></i>
-                <span>Logs & Activity</span>
-            </a>
-        </li>
-
-        <li>
-            <a href="admin_security.php">
+            <a href="admin_backup_security.php">
                 <i class="fa-solid fa-shield-halved"></i>
-                <span>Backup & Security</span>
+                <span>Backup</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="security_overview.php">
+                <i class="fa-solid fa-database"></i>
+                <span>Security Overview</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="audit_logs.php">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Audit Logs</span>
             </a>
         </li>
 
     </ul>
 
+    <!-- LOGOUT -->
     <div class="admin-logout">
         <a href="logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -939,9 +948,11 @@ $exportUrl = 'admin_reports.php?' .
 
 </div>
 
+<!-- MOBILE SIDEBAR OVERLAY -->
 <div class="admin-overlay"
      id="adminOverlay"
-     onclick="closeAdminSidebar()"></div>
+     onclick="closeAdminSidebar()">
+</div>
 
 <!-- =========================================================
      MAIN CONTENT

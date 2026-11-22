@@ -1,9 +1,31 @@
 <?php
-
 session_start();
-include 'database.php';
-include 'activity_log.php';
 
+require_once 'database.php';
+require_once 'activity_log.php';
+
+/* =========================================================
+   HELPER: RECORD LOGIN ATTEMPTS
+========================================================= */
+
+function recordLoginAttempt(mysqli $conn, string $email, bool $success): void
+{
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
+
+    $stmt = $conn->prepare("
+        INSERT INTO security_login_attempts
+        (identifier, ip_address, success)
+        VALUES (?, ?, ?)
+    ");
+
+    if ($stmt) {
+        $status = $success ? 1 : 0;
+
+        $stmt->bind_param("ssi", $email, $ip, $status);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
 
 /* =========================================================
    GET LOGIN DATA
@@ -12,233 +34,147 @@ include 'activity_log.php';
 $email = trim($_POST['email'] ?? '');
 $password = $_POST['password'] ?? '';
 
-
 /* =========================================================
    VALIDATION
 ========================================================= */
 
 if ($email === '' || $password === '') {
-
     echo "<script>
         alert('Please enter your email and password.');
         window.location='index.html';
     </script>";
-
     exit();
 }
 
-
 /* =========================================================
-   FIND USER
+   FIND USER USING PREPARED STATEMENT
 ========================================================= */
 
-$safeEmail = mysqli_real_escape_string(
-    $conn,
-    $email
-);
-
-$sql = "
-    SELECT *
+$stmt = $conn->prepare("
+    SELECT id, name, email, password, role
     FROM users
-    WHERE email='$safeEmail'
+    WHERE email = ?
     LIMIT 1
-";
+");
 
-$result = mysqli_query(
-    $conn,
-    $sql
-);
+if (!$stmt) {
+    error_log("Login query preparation failed: " . $conn->error);
+    die("Unable to process login. Please try again later.");
+}
 
+$stmt->bind_param("s", $email);
+$stmt->execute();
 
-if (
-    $result &&
-    mysqli_num_rows($result) == 1
-) {
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
 
-    $user = mysqli_fetch_assoc($result);
+$stmt->close();
 
+/* =========================================================
+   VERIFY USER AND PASSWORD
+========================================================= */
 
-    /* =====================================================
-       VERIFY PASSWORD
-    ===================================================== */
+if (!$user || !password_verify($password, $user['password'])) {
 
-    if (
-        password_verify(
-            $password,
-            $user['password']
-        )
-    ) {
-
-
-        /* ================================================
-           SESSION
-        ================================================= */
-
-        $_SESSION['user_id'] =
-            $user['id'];
-
-        $_SESSION['name'] =
-            $user['name'];
-
-        $_SESSION['role'] =
-            $user['role'];
-
-
-        /* ================================================
-           ACTIVITY LOG
-        ================================================= */
-
-        addActivityLog(
-            $conn,
-            intval($user['id']),
-            $user['name'],
-            $user['role'],
-            'Login',
-            'User logged into the PLMUN Classroom system.'
-        );
-
-
-        /* ================================================
-           ADMIN
-        ================================================= */
-
-        if (
-            $user['role'] === 'admin'
-        ) {
-
-            header(
-                "Location: admin_dashboard.php"
-            );
-
-            exit();
-        }
-
-
-        /* ================================================
-           TEACHER
-        ================================================= */
-
-        elseif (
-            $user['role'] === 'teacher'
-        ) {
-
-            header(
-                "Location: teacher_dashboard.php"
-            );
-
-            exit();
-        }
-
-
-        /* ================================================
-           STUDENT
-        ================================================= */
-
-        elseif (
-            $user['role'] === 'student'
-        ) {
-
-            header(
-                "Location: student_dashboard.php"
-            );
-
-            exit();
-        }
-
-        elseif (
-            $user ['role'] === 'director') 
-            {
-
-        header(
-            "Location: director_dashboard.php"
-            );
-
-            }
-        elseif (
-            $user ['role'] === 'program_chair') 
-            {
-
-        header(
-            "Location: program_chair_dashboard.php"
-            );
-
-        exit();
-            }
-
-
-        /* ================================================
-           UNKNOWN ROLE
-        ================================================= */
-
-        else {
-
-            session_destroy();
-
-            echo "<script>
-                alert('Invalid user role.');
-                window.location='index.html';
-            </script>";
-
-            exit();
-        }
-
-    } else {
-
-        echo "<script>
-            alert('Wrong Password');
-            window.location='index.html';
-        </script>";
-
-        exit();
-    }
-
-} else {
+    // Record failed login
+    recordLoginAttempt($conn, $email, false);
 
     echo "<script>
-        alert('Email Not Found');
+        alert('Invalid email or password.');
         window.location='index.html';
     </script>";
 
     exit();
 }
 
-$ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-$agent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500);
+/* =========================================================
+   CHECK VALID USER ROLE
+========================================================= */
 
-$stmt = $conn->prepare("
-    INSERT INTO admin_login_logs
-    (user_id, email, status, ip_address, user_agent)
-    VALUES (?, ?, 'success', ?, ?)
-");
+$allowedRoles = [
+    'admin',
+    'director',
+    'program_chair',
+    'teacher',
+    'student'
+];
 
-$stmt->bind_param(
-    "isss",
-    $user['id'],
-    $user['email'],
-    $ip,
-    $agent
+if (!in_array($user['role'], $allowedRoles, true)) {
+
+    recordLoginAttempt($conn, $email, false);
+
+    echo "<script>
+        alert('Invalid user role. Please contact the administrator.');
+        window.location='index.html';
+    </script>";
+
+    exit();
+}
+
+/* =========================================================
+   REGENERATE SESSION ID
+========================================================= */
+
+session_regenerate_id(true);
+
+/* =========================================================
+   CREATE SESSION
+========================================================= */
+
+$_SESSION['user_id'] = (int)$user['id'];
+$_SESSION['name'] = $user['name'];
+$_SESSION['role'] = $user['role'];
+
+/* =========================================================
+   RECORD SUCCESSFUL LOGIN
+========================================================= */
+
+recordLoginAttempt($conn, $email, true);
+
+/* =========================================================
+   ACTIVITY AUDIT LOG
+========================================================= */
+
+addActivityLog(
+    $conn,
+    (int)$user['id'],
+    $user['name'],
+    $user['role'],
+    'Login',
+    'User successfully logged into the PLMUN Classroom system.'
 );
 
-$stmt->execute();
-$stmt->close();
+/* =========================================================
+   REDIRECT ACCORDING TO ROLE
+========================================================= */
 
-$ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-$agent = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500);
+switch ($user['role']) {
 
-$stmt = $conn->prepare("
-    INSERT INTO admin_login_logs
-    (user_id, email, status, ip_address, user_agent)
-    VALUES (NULL, ?, 'failed', ?, ?)
-");
+    case 'admin':
+        header("Location: admin_dashboard.php");
+        exit();
 
-$stmt->bind_param(
-    "sss",
-    $email,
-    $ip,
-    $agent
-);
+    case 'director':
+        header("Location: director_dashboard.php");
+        exit();
 
-$stmt->execute();
-$stmt->close();
+    case 'program_chair':
+        header("Location: program_chair_dashboard.php");
+        exit();
 
+    case 'teacher':
+        header("Location: teacher_dashboard.php");
+        exit();
+
+    case 'student':
+        header("Location: student_dashboard.php");
+        exit();
+
+    default:
+        session_unset();
+        session_destroy();
+
+        header("Location: index.html");
+        exit();
+}
 ?>

@@ -648,6 +648,8 @@ $classes = array_values($classes);
 
     <title>Instructor Assignment | PLMUN Classroom</title>
 
+    <link rel="shortcut icon" href="img/plmun logo.png" type="image/x-icon">
+
     <link rel="stylesheet" href="instructor_assignment.css">
 
     <link

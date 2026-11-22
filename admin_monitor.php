@@ -836,190 +836,93 @@ if (
 
 <body>
 
-
-<!-- =========================================================
+<!-- =========================================
      SIDEBAR
-========================================================= -->
+========================================= -->
 
-<div
-    class="admin-sidebar"
-    id="adminSidebar"
->
-
+<div class="admin-sidebar" id="adminSidebar">
 
     <!-- SIDEBAR HEADER -->
-
     <div class="admin-sidebar-header">
-
-        <h1>
-            Admin
-        </h1>
-
+        <h1>ADMIN</h1>
     </div>
 
-
-    <!-- MENU -->
-
+    <!-- SIDEBAR MENU -->
     <ul class="admin-menu">
 
-
-        <!-- DASHBOARD -->
-
         <li>
-
             <a href="admin_dashboard.php">
-
                 <i class="fa-solid fa-house"></i>
-
-                <span>
-                    Dashboard
-                </span>
-
+                <span>Dashboard</span>
             </a>
-
         </li>
 
-
-        <!-- USER MANAGEMENT -->
-
         <li>
-
             <a href="admin_users.php">
-
-                <i class="fa-solid fa-user"></i>
-
-                <span>
-                    User Management
-                </span>
-
+                <i class="fa-solid fa-user-group"></i>
+                <span>User Management</span>
             </a>
-
         </li>
 
-
-        <!-- SYSTEM SETTINGS -->
-
         <li>
-
             <a href="admin_settings.php">
-
                 <i class="fa-solid fa-gear"></i>
-
-                <span>
-                    System Settings
-                </span>
-
+                <span>System Settings</span>
             </a>
-
         </li>
 
-        <!-- SYSTEM MONITOR -->
-
         <li>
-
-            <a
-                href="admin_monitor.php"
-                class="active"
-            >
-
+            <a href="admin_monitor.php" class="active">
                 <i class="fa-solid fa-desktop"></i>
-
-                <span>
-                    System Monitor
-                </span>
-
+                <span>System Monitor</span>
             </a>
-
         </li>
 
-
-        <!-- REPORTS -->
-
         <li>
-
             <a href="admin_reports.php">
-
-                <i class="fa-solid fa-wave-square"></i>
-
-                <span>
-                    Reports & Analytics
-                </span>
-
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Reports &amp; Analytics</span>
             </a>
-
         </li>
 
-
-        <!-- LOGS -->
-
         <li>
-
-            <a href="admin_logs.php">
-
-                <i class="fa-regular fa-clock"></i>
-
-                <span>
-                    Logs & Activity
-                </span>
-
+            <a href="admin_backup_security.php">
+                <i class="fa-solid fa-database"></i>
+                <span>Backup</span>
             </a>
-
         </li>
 
-
-        <!-- SECURITY -->
-
         <li>
-
-            <a href="admin_security.php">
-
+            <a href="security_overview.php">
                 <i class="fa-solid fa-shield-halved"></i>
-
-                <span>
-                    Backup & Security
-                </span>
-
+                <span>Security Overview</span>
             </a>
-
         </li>
 
+        <li>
+            <a href="audit_logs.php">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Audit Logs</span>
+            </a>
+        </li>
 
     </ul>
 
-
-    <!-- =====================================================
-         LOGOUT
-    ====================================================== -->
-
+    <!-- LOGOUT -->
     <div class="admin-logout">
-
         <a href="logout.php">
-
-            <i
-                class="fa-solid fa-right-from-bracket"
-            ></i>
-
-            <span>
-                Log out
-            </span>
-
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Log out</span>
         </a>
-
     </div>
-
 
 </div>
 
-
-<!-- =========================================================
-     MOBILE OVERLAY
-========================================================= -->
-
-<div
-    class="admin-overlay"
-    id="adminOverlay"
-    onclick="closeAdminSidebar()"
-></div>
+<!-- MOBILE SIDEBAR OVERLAY -->
+<div class="admin-overlay"
+     id="adminOverlay"
+     onclick="closeAdminSidebar()">
+</div>
 
 
 <!-- =========================================================
