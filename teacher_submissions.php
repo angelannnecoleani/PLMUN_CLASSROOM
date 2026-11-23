@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 
@@ -458,7 +457,7 @@ $attachmentTotal = count($assessmentAttachments);
 
     <link rel="stylesheet" href="teacher_class.css?v=5">
 
-    <link rel="stylesheet" href="teacher_submissions.css">
+    <link rel="stylesheet" href="teacher_submissions.css?v=3">
 
     <style>
 
@@ -812,168 +811,180 @@ $attachmentTotal = count($assessmentAttachments);
                     <?php echo e($assessment['title']); ?>
                 </h2>
 
-                <p class="submissions-sub">
+                <div class="instructions-meta">
 
-                    <?php echo e($assessment['type']); ?>
+                    <span class="meta-item">
+                        <i class="fa-solid fa-tag"></i>
+                        <?php echo e($assessment['type']); ?>
+                    </span>
 
-                    &middot;
+                    <span class="meta-item">
+                        <i class="fa-solid fa-star"></i>
+                        <?php echo e($assessment['points']); ?> pts
+                    </span>
 
-                    <?php echo e($assessment['points']); ?> pts
+                    <span class="meta-item">
+                        <i class="fa-regular fa-calendar"></i>
+                        Due
+                        <?php
+                        echo !empty($assessment['due_date'])
+                            ? date("F d, Y", strtotime($assessment['due_date']))
+                            : 'No due date';
+                        ?>
+                    </span>
 
-                    &middot;
+                </div>
 
-                    Due
-
-                    <?php
-                    echo !empty($assessment['due_date'])
-                        ? date("F d, Y", strtotime($assessment['due_date']))
-                        : 'No due date';
-                    ?>
-
-                </p>
+                <!-- DESCRIPTION -->
 
                 <?php if (!empty($description)): ?>
 
-                    <p class="instructions-desc">
-                        <?php echo nl2br(e($description)); ?>
-                    </p>
+                    <div class="instructions-desc"><?php echo nl2br(e($description)); ?></div>
 
                 <?php else: ?>
 
-                    <p class="instructions-desc instructions-empty">
-                        No description provided.
-                    </p>
+                    <div class="instructions-desc instructions-empty">No description provided.</div>
 
                 <?php endif; ?>
 
-                <!-- IMAGES -->
+                <!-- ATTACHMENTS -->
 
-                <?php if (!empty($attImages)): ?>
+                <?php if ($attachmentTotal > 0): ?>
 
-                    <div class="attach-section-title">
-                        Images (<?php echo count($attImages); ?>)
-                    </div>
+                <div class="instr-attachments">
 
-                    <div class="instr-images">
+                    <!-- IMAGES -->
 
-                        <?php foreach ($attImages as $img): ?>
+                    <?php if (!empty($attImages)): ?>
 
-                            <?php
-                            $imagePath = basename($img['file_path'] ?? '');
-                            ?>
+                        <div class="attach-section-title">
+                            Images (<?php echo count($attImages); ?>)
+                        </div>
 
-                            <a
-                                href="uploads/<?php echo rawurlencode($imagePath); ?>"
-                                target="_blank"
-                                rel="noopener">
+                        <div class="instr-images">
 
-                                <img
-                                    src="uploads/<?php echo rawurlencode($imagePath); ?>"
-                                    alt="<?php echo e($img['original_name'] ?: 'Attached image'); ?>"
-                                    loading="lazy">
+                            <?php foreach ($attImages as $img): ?>
 
-                            </a>
-
-                        <?php endforeach; ?>
-
-                    </div>
-
-                <?php endif; ?>
-
-                <!-- FILES -->
-
-                <?php if (!empty($attFiles)): ?>
-
-                    <div class="attach-section-title">
-                        Files (<?php echo count($attFiles); ?>)
-                    </div>
-
-                    <div class="instr-list">
-
-                        <?php foreach ($attFiles as $f): ?>
-
-                            <?php
-                            $fname = $f['original_name']
-                                ?: basename($f['file_path'] ?? '');
-
-                            $filePath = basename($f['file_path'] ?? '');
-                            ?>
-
-                            <a
-                                href="uploads/<?php echo rawurlencode($filePath); ?>"
-                                target="_blank"
-                                rel="noopener"
-                                class="instr-item">
-
-                                <i class="fa-solid <?php echo attachment_icon($fname); ?>"></i>
-
-                                <span><?php echo e($fname); ?></span>
-
-                                <i class="fa-solid fa-arrow-up-right-from-square open-icon"></i>
-
-                            </a>
-
-                        <?php endforeach; ?>
-
-                    </div>
-
-                <?php endif; ?>
-
-                <!-- LINKS -->
-
-                <?php if (!empty($attLinks)): ?>
-
-                    <div class="attach-section-title">
-                        Links (<?php echo count($attLinks); ?>)
-                    </div>
-
-                    <div class="instr-list">
-
-                        <?php foreach ($attLinks as $l): ?>
-
-                            <?php
-                            $linkUrl = trim((string)($l['url'] ?? ''));
-
-                            $safeUrl = filter_var(
-                                $linkUrl,
-                                FILTER_VALIDATE_URL
-                            ) && preg_match(
-                                '#^https?://#i',
-                                $linkUrl
-                            ) ? $linkUrl : '';
-                            ?>
-
-                            <?php if ($safeUrl !== ''): ?>
+                                <?php
+                                $imagePath = basename($img['file_path'] ?? '');
+                                ?>
 
                                 <a
-                                    href="<?php echo e($safeUrl); ?>"
+                                    href="uploads/<?php echo rawurlencode($imagePath); ?>"
                                     target="_blank"
-                                    rel="noopener noreferrer"
+                                    rel="noopener">
+
+                                    <img
+                                        src="uploads/<?php echo rawurlencode($imagePath); ?>"
+                                        alt="<?php echo e($img['original_name'] ?: 'Attached image'); ?>"
+                                        loading="lazy">
+
+                                </a>
+
+                            <?php endforeach; ?>
+
+                        </div>
+
+                    <?php endif; ?>
+
+                    <!-- FILES -->
+
+                    <?php if (!empty($attFiles)): ?>
+
+                        <div class="attach-section-title">
+                            Files (<?php echo count($attFiles); ?>)
+                        </div>
+
+                        <div class="instr-list">
+
+                            <?php foreach ($attFiles as $f): ?>
+
+                                <?php
+                                $fname = $f['original_name']
+                                    ?: basename($f['file_path'] ?? '');
+
+                                $filePath = basename($f['file_path'] ?? '');
+                                ?>
+
+                                <a
+                                    href="uploads/<?php echo rawurlencode($filePath); ?>"
+                                    target="_blank"
+                                    rel="noopener"
                                     class="instr-item">
 
-                                    <i class="fa-solid fa-link"></i>
+                                    <i class="fa-solid <?php echo attachment_icon($fname); ?>"></i>
 
-                                    <span><?php echo e($linkUrl); ?></span>
+                                    <span><?php echo e($fname); ?></span>
 
                                     <i class="fa-solid fa-arrow-up-right-from-square open-icon"></i>
 
                                 </a>
 
-                            <?php else: ?>
+                            <?php endforeach; ?>
 
-                                <div class="instr-item">
+                        </div>
 
-                                    <i class="fa-solid fa-link"></i>
+                    <?php endif; ?>
 
-                                    <span><?php echo e($linkUrl); ?></span>
+                    <!-- LINKS -->
 
-                                </div>
+                    <?php if (!empty($attLinks)): ?>
 
-                            <?php endif; ?>
+                        <div class="attach-section-title">
+                            Links (<?php echo count($attLinks); ?>)
+                        </div>
 
-                        <?php endforeach; ?>
+                        <div class="instr-list">
 
-                    </div>
+                            <?php foreach ($attLinks as $l): ?>
+
+                                <?php
+                                $linkUrl = trim((string)($l['url'] ?? ''));
+
+                                $safeUrl = filter_var(
+                                    $linkUrl,
+                                    FILTER_VALIDATE_URL
+                                ) && preg_match(
+                                    '#^https?://#i',
+                                    $linkUrl
+                                ) ? $linkUrl : '';
+                                ?>
+
+                                <?php if ($safeUrl !== ''): ?>
+
+                                    <a
+                                        href="<?php echo e($safeUrl); ?>"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="instr-item">
+
+                                        <i class="fa-solid fa-link"></i>
+
+                                        <span><?php echo e($linkUrl); ?></span>
+
+                                        <i class="fa-solid fa-arrow-up-right-from-square open-icon"></i>
+
+                                    </a>
+
+                                <?php else: ?>
+
+                                    <div class="instr-item">
+
+                                        <i class="fa-solid fa-link"></i>
+
+                                        <span><?php echo e($linkUrl); ?></span>
+
+                                    </div>
+
+                                <?php endif; ?>
+
+                            <?php endforeach; ?>
+
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
 
                 <?php endif; ?>
 
@@ -1114,6 +1125,10 @@ $attachmentTotal = count($assessmentAttachments);
                                 $s['profile_image'] ?? ''
                             );
 
+                            $gradeValue = $s['grade'] !== null
+                                ? e($s['grade'])
+                                : '';
+
                             ?>
 
                             <tr>
@@ -1239,29 +1254,31 @@ $attachmentTotal = count($assessmentAttachments);
                                             name="student_id"
                                             value="<?php echo (int)$s['student_id']; ?>">
 
-                                        <input
-                                            type="number"
-                                            name="grade"
-                                            class="grade-input"
-                                            placeholder="--"
-                                            min="0"
-                                            max="<?php echo e($assessment['points']); ?>"
-                                            step="0.5"
-                                            value="<?php
-                                                echo $s['grade'] !== null
-                                                    ? e($s['grade'])
-                                                    : '';
-                                            ?>">
+                                        <div class="grade-field">
 
-                                        <span class="grade-total">
-                                            / <?php echo e($assessment['points']); ?>
-                                        </span>
+                                            <input
+                                                type="number"
+                                                name="grade"
+                                                class="grade-input"
+                                                placeholder="--"
+                                                min="0"
+                                                max="<?php echo e($assessment['points']); ?>"
+                                                step="0.5"
+                                                value="<?php echo $gradeValue; ?>">
+
+                                            <span class="grade-total">
+                                                / <?php echo e($assessment['points']); ?>
+                                            </span>
+
+                                        </div>
 
                                         <button
                                             type="submit"
-                                            class="btn-mini btn-mini-primary">
+                                            class="btn-save"
+                                            aria-label="Save grade">
 
-                                            Save
+                                            <i class="fa-solid fa-floppy-disk"></i>
+                                            <span>Save</span>
 
                                         </button>
 

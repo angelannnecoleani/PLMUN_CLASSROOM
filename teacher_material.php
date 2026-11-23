@@ -108,7 +108,7 @@ if (!$user) {
 }
 
 /* =========================================
-   TEACHER DISPLAY NAME
+   LOGGED-IN USER DISPLAY NAME
 ========================================= */
 
 $teacherName = trim(
@@ -124,12 +124,11 @@ if ($teacherName === '') {
 }
 
 /* =========================================
-   PROFILE IMAGE VALIDATION
+   TOPBAR PROFILE IMAGE VALIDATION
 ========================================= */
 
 $rawProfileFile = trim((string)($user['profile_image'] ?? ''));
 
-// Support both "photo.jpg" and "uploads/photo.jpg"
 $profileFile = basename(
     str_replace('\\', '/', $rawProfileFile)
 );
@@ -155,15 +154,39 @@ $profileImageUrl = $hasProfileImage
     : '';
 
 /* =========================================
-   FETCH MATERIALS
+   FETCH MATERIALS WITH CORRECT CREATOR
 ========================================= */
 
 $materialsStmt = mysqli_prepare(
     $conn,
-    "SELECT *
-     FROM materials
-     WHERE class_id = ?
-     ORDER BY id DESC"
+    "SELECT
+        m.*,
+
+        COALESCE(
+            creator.name,
+            primary_teacher.name,
+            'Unknown Teacher'
+        ) AS creator_name,
+
+        COALESCE(
+            creator.profile_image,
+            primary_teacher.profile_image
+        ) AS creator_profile_image
+
+     FROM materials m
+
+     LEFT JOIN classes c
+        ON m.class_id = c.id
+
+     LEFT JOIN users creator
+        ON m.created_by = creator.id
+
+     LEFT JOIN users primary_teacher
+        ON c.teacher_id = primary_teacher.id
+
+     WHERE m.class_id = ?
+
+     ORDER BY m.id DESC"
 );
 
 if (!$materialsStmt) {
@@ -180,6 +203,7 @@ $materialsQuery = mysqli_stmt_get_result($materialsStmt);
 ========================================= */
 
 function material_icon_for($filename) {
+
     $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
     if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
@@ -256,6 +280,7 @@ if (count($materials) > 0) {
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -280,6 +305,7 @@ if (count($materials) > 0) {
     <link rel="stylesheet" href="teacher_material.css">
 
     <style>
+
         /* =========================================
            TOPBAR PROFILE IMAGE
         ========================================= */
@@ -348,7 +374,9 @@ if (count($materials) > 0) {
         .material-teacher-avatar-wrapper [hidden] {
             display: none !important;
         }
+
     </style>
+
 </head>
 
 <body class="materials-page">
@@ -635,13 +663,54 @@ if (count($materials) > 0) {
                             }
                         }
 
+                        /* =========================================
+                           CREATOR PROFILE IMAGE
+                        ========================================= */
+
+                        $creatorImage = trim(
+                            (string)($material['creator_profile_image'] ?? '')
+                        );
+
+                        $creatorImageFile = basename(
+                            str_replace('\\', '/', $creatorImage)
+                        );
+
+                        $defaultCreatorImages = [
+                            '',
+                            'default.png',
+                            'default.jpg',
+                            'default.jpeg',
+                            'default.svg',
+                            'null'
+                        ];
+
+                        $hasCreatorImage = !in_array(
+                            strtolower($creatorImageFile),
+                            $defaultCreatorImages,
+                            true
+                        ) && is_file(__DIR__ . '/uploads/' . $creatorImageFile)
+                          && is_readable(__DIR__ . '/uploads/' . $creatorImageFile);
+
+                        $creatorImageUrl = $hasCreatorImage
+                            ? 'uploads/' . rawurlencode($creatorImageFile)
+                            : '';
+
+                        /* =========================================
+                           MATERIAL DETAIL PAYLOAD
+                        ========================================= */
+
                         $payload = [
                             'title' => $material['title'] ?? '',
                             'description' => $material['description'] ?? '',
+
+                            'creator_name' => $material['creator_name'] ?? 'Unknown Teacher',
+                            'creator_image' => $creatorImageUrl,
+
                             'posted' => date(
                                 "M d, Y · g:i A",
                                 strtotime($material['created_at'])
                             ),
+
                             'attachments' => array_values(
                                 array_map(
                                     fn($a) => [
@@ -677,12 +746,20 @@ if (count($materials) > 0) {
                                     <div>
 
                                         <span class="material-title">
-                                            <?php echo htmlspecialchars($material['title']); ?>
+                                            <?php echo htmlspecialchars($material['title'] ?? 'Untitled Material'); ?>
                                         </span>
 
                                         <div class="material-meta">
 
-                                            Posted
+                                            Posted by
+                                            <?php echo htmlspecialchars(
+                                                $material['creator_name'] ?? 'Unknown Teacher',
+                                                ENT_QUOTES,
+                                                'UTF-8'
+                                            ); ?>
+
+                                            &middot;
+
                                             <?php echo date(
                                                 "M d, Y",
                                                 strtotime($material['created_at'])
@@ -861,28 +938,24 @@ if (count($materials) > 0) {
 
             <div class="material-modal-body">
 
-                <!-- TEACHER PROFILE AND POST DETAILS -->
+                <!-- CORRECT MATERIAL CREATOR -->
                 <div class="material-teacher-row">
 
                     <div class="material-teacher-info">
 
-                        <!-- FIXED TEACHER AVATAR -->
                         <div class="material-teacher-avatar-wrapper">
 
-                            <?php if ($hasProfileImage): ?>
-
-                                <img
-                                    src="<?php echo htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-8'); ?>"
-                                    class="material-teacher-avatar"
-                                    alt="<?php echo htmlspecialchars($teacherName, ENT_QUOTES, 'UTF-8'); ?>"
-                                    onerror="this.hidden=true; this.nextElementSibling.hidden=false;"
-                                >
-
-                            <?php endif; ?>
+                            <img
+                                src=""
+                                class="material-teacher-avatar"
+                                id="mdCreatorImage"
+                                alt="Instructor profile"
+                                hidden
+                            >
 
                             <div
                                 class="material-teacher-avatar material-avatar-default"
-                                <?php echo $hasProfileImage ? 'hidden' : ''; ?>
+                                id="mdCreatorFallback"
                             >
                                 <i class="fa-solid fa-user"></i>
                             </div>
@@ -891,8 +964,8 @@ if (count($materials) > 0) {
 
                         <div class="material-teacher-details">
 
-                            <strong>
-                                <?php echo htmlspecialchars($teacherName); ?>
+                            <strong id="mdCreatorName">
+                                Unknown Teacher
                             </strong>
 
                             <span id="mdPosted"></span>
@@ -1431,6 +1504,42 @@ function toggleTopic(id) {
         document.getElementById('mdPosted').textContent =
             'Posted ' + (data.posted || '');
 
+        /* =========================================
+           DISPLAY CORRECT MATERIAL CREATOR
+        ========================================= */
+
+        const creatorName = document.getElementById('mdCreatorName');
+        const creatorImage = document.getElementById('mdCreatorImage');
+        const creatorFallback = document.getElementById('mdCreatorFallback');
+
+        creatorName.textContent =
+            data.creator_name || 'Unknown Teacher';
+
+        creatorImage.hidden = true;
+        creatorImage.removeAttribute('src');
+
+        creatorFallback.hidden = false;
+
+        if (data.creator_image) {
+
+            creatorImage.onload = function() {
+                creatorImage.hidden = false;
+                creatorFallback.hidden = true;
+            };
+
+            creatorImage.onerror = function() {
+                creatorImage.hidden = true;
+                creatorFallback.hidden = false;
+            };
+
+            creatorImage.src = data.creator_image;
+
+        }
+
+        /* =========================================
+           DESCRIPTION
+        ========================================= */
+
         const caption = document.getElementById('mdCaption');
 
         caption.textContent =
@@ -1442,6 +1551,10 @@ function toggleTopic(id) {
         );
 
         caption.style.whiteSpace = 'pre-wrap';
+
+        /* =========================================
+           ATTACHMENTS
+        ========================================= */
 
         const links = document.getElementById('mdLinks');
         const files = document.getElementById('mdFiles');
@@ -1471,7 +1584,6 @@ function toggleTopic(id) {
 
             } else {
 
-                // Normalize attachment filename.
                 const filename = String(a.value)
                     .replace(/\\/g, '/')
                     .split('/')

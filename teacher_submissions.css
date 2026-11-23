@@ -1,3 +1,19 @@
+/* ============================================================
+   TEACHER SUBMISSIONS – REDESIGNED
+   Replace your existing teacher_submissions.css with this file.
+   ============================================================ */
+
+:root {
+    --ts-blue: #3f87b5;
+    --ts-blue-dark: #2f76a7;
+    --ts-blue-soft: #eaf3fa;
+    --ts-ink: #1a2d3e;
+    --ts-text: #333;
+    --ts-muted: #888;
+    --ts-line: #e0e8f0;
+    --ts-green: #2f9e64;
+}
+
 .back-link {
     display: inline-flex;
     align-items: center;
@@ -7,145 +23,49 @@
     font-weight: 600;
     font-size: 14px;
     margin-bottom: 18px;
+    transition: color .15s, gap .15s;
 }
-.back-link:hover { color: #3f87b5; }
+.back-link:hover { color: var(--ts-blue); gap: 10px; }
 
+/* ---------- Header + summary ---------- */
 .submissions-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     flex-wrap: wrap;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 22px;
 }
 
 .submissions-header h2 {
     font-weight: 800;
     font-size: 22px;
-    color: #1a2d3e;
+    color: var(--ts-ink);
+    margin: 0;
     word-break: break-word;
 }
 
 .submissions-sub {
-    color: #888;
+    color: var(--ts-muted);
     font-size: 14px;
     margin-top: 4px;
 }
 
-.submissions-summary {
-    display: flex;
-    gap: 12px;
-}
+.submissions-summary { display: flex; gap: 12px; }
 
 .summary-pill {
     background: #fff;
-    border: 1px solid #e0e8f0;
-    border-radius: 10px;
-    padding: 10px 18px;
-    text-align: center;
-}
-
-.summary-pill strong {
-    display: block;
-    font-size: 18px;
-    color: #1a2d3e;
-}
-
-.summary-pill span {
-    font-size: 12px;
-    color: #888;
-}
-
-.submissions-list {
-    background: #fff;
-    border: 1px solid #e0e8f0;
+    border: 1px solid var(--ts-line);
     border-radius: 12px;
-    overflow: hidden;
-}
-
-.submission-row {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.submission-row:last-child { border-bottom: none; }
-
-.submission-avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    object-fit: cover;
-    flex-shrink: 0;
-    background: #d4dbe5;
-}
-
-.submission-avatar-def {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
-}
-
-.submission-main { flex: 1; min-width: 0; }
-
-.submission-name {
-    font-weight: 600;
-    font-size: 15px;
-    color: #222;
-}
-
-.submission-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 4px;
-    font-size: 13px;
-    color: #888;
-}
-
-.status-badge {
-    font-size: 12px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-}
-
-.badge-missing   { background: #fdeaea; color: #c0392b; }
-.badge-submitted { background: #e8f3fb; color: #3f87b5; }
-.badge-done      { background: #e9f9ee; color: #2f9e64; }
-
-.grade-form {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
-.grade-input {
-    width: 60px;
-    height: 38px;
+    padding: 10px 20px;
     text-align: center;
-    border: 1px solid #dde4ec;
-    border-radius: 6px;
-    font-size: 14px;
+    min-width: 96px;
+    box-shadow: 0 1px 2px rgba(26,45,62,.04);
 }
-.grade-input:focus {
-    border-color: #3f87b5;
-    outline: none;
-}
+.summary-pill strong { display: block; font-size: 19px; color: var(--ts-ink); line-height: 1.2; }
+.summary-pill span   { font-size: 12px; color: var(--ts-muted); }
 
-.grade-total {
-    font-size: 13px;
-    color: #888;
-}
-/* ============================================================
-   SUBMISSIONS TABS (Instructions / Student work)
-   ============================================================ */
+/* ---------- Tabs ---------- */
 .submissions-tabs {
     display: flex;
     align-items: center;
@@ -155,6 +75,7 @@
 }
 
 .submissions-tab {
+    position: relative;
     border: none;
     background: none;
     padding: 10px 18px;
@@ -163,17 +84,21 @@
     color: #555;
     cursor: pointer;
     border-radius: 8px 8px 0 0;
-    transition: background 0.2s, color 0.2s;
+    transition: background .2s, color .2s;
 }
-
-.submissions-tab:hover {
-    background: #f5f6f8;
-}
-
+.submissions-tab:hover { background: #f5f6f8; }
 .submissions-tab.active {
-    background: #e8e8e8;
-    color: #1a2d3e;
-    font-weight: 600;
+    background: transparent;
+    color: var(--ts-ink);
+    font-weight: 700;
+}
+.submissions-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 10px; right: 10px; bottom: -1px;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--ts-blue);
 }
 
 /* ============================================================
@@ -181,105 +106,93 @@
    ============================================================ */
 .instructions-card {
     background: #fff;
-    border: 1px solid #e0e8f0;
+    border: 1px solid var(--ts-line);
     border-radius: 12px;
-    padding: 24px 28px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(26,45,62,.05);
 }
 
 .instructions-title {
     font-weight: 800;
     font-size: 20px;
-    color: #1a2d3e;
-    margin-bottom: 4px;
+    color: var(--ts-ink);
+    margin: 0 0 8px;
     word-break: break-word;
 }
 
-.instructions-desc {
-    font-size: 15px;
-    line-height: 1.7;
-    color: #333;
-    margin: 16px 0;
-    white-space: pre-wrap;
-}
-
-.instructions-empty {
-    color: #aaa;
-    font-style: italic;
-}
-
-.instructions-image {
-    display: block;
-    width: 100%;
-    max-width: 320px;
-    max-height: 220px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #eee;
-    margin-bottom: 14px;
-}
-
-.instructions-link,
-.instructions-file {
-    display: inline-flex;
+/* type · points · due date on one quiet line */
+.instructions-meta {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #3f87b5;
-    text-decoration: none;
-    background: #f0f6fb;
-    border: 1px solid #cde0ef;
-    border-radius: 6px;
-    padding: 8px 14px;
-    margin-right: 10px;
-    margin-bottom: 8px;
-    word-break: break-all;
-    transition: background 0.2s;
-    max-width: 100%;
+    gap: 4px 18px;
+    margin: 0 0 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 13.5px;
+    color: #6b7c8c;
 }
+.meta-item { display: inline-flex; align-items: center; gap: 7px; }
+.meta-item i { color: var(--ts-blue); font-size: 12px; }
 
-.instructions-link:hover,
-.instructions-file:hover {
-    background: #daeaf5;
-    color: #2f76a7;
+/* plain, tight description: no box, no extra padding.
+   white-space is forced to normal because nl2br() already adds <br>. */
+.instructions-desc {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ts-text);
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
+.instructions-empty { color: #aaa; font-style: italic; }
+
+.instr-attachments {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #edf2f7;
+}
+.instr-attachments .attach-section-title { margin: 0 0 8px; }
+.instr-attachments .attach-section-title:not(:first-child) { margin-top: 14px; }
 
 /* ============================================================
-   SUBMISSIONS TABLE (Student work panel)
+   STUDENT WORK TABLE
    ============================================================ */
 .submissions-table-wrap {
     background: #fff;
-    border: 1px solid #e0e8f0;
-    border-radius: 12px;
+    border: 1px solid var(--ts-line);
+    border-radius: 14px;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+    box-shadow: 0 1px 3px rgba(26,45,62,.05);
 }
 
-.submissions-table {
-    width: 100%;
-    border-collapse: collapse;
-}
+.submissions-table { width: 100%; border-collapse: collapse; }
 
 .submissions-table thead th {
     text-align: left;
-    background: #e8e8e8;
-    color: #222;
-    font-size: 14px;
+    background: #f3f6f9;
+    color: #5a6b7b;
+    font-size: 12.5px;
     font-weight: 700;
-    padding: 14px 20px;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    padding: 13px 20px;
+    border-bottom: 1px solid var(--ts-line);
+    white-space: nowrap;
 }
 
 .submissions-table tbody td {
-    padding: 14px 20px;
+    padding: 12px 20px;
     border-top: 1px solid #f0f0f0;
     font-size: 14px;
-    color: #333;
+    color: var(--ts-text);
     vertical-align: middle;
 }
-
-.submissions-table tbody tr:hover {
-    background: #fafbfc;
-}
+.submissions-table tbody tr:first-child td { border-top: none; }
+.submissions-table tbody tr { transition: background .15s; }
+.submissions-table tbody tr:hover { background: #f9fbfd; }
 
 .student-name-cell {
     display: flex;
@@ -289,41 +202,128 @@
     color: #222;
 }
 
-.cell-muted {
-    color: #bbb;
+.submission-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #d4dbe5;
+}
+.submission-avatar-def {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
 }
 
-.submission-file-link {
-    display: block;
-    margin-top: 4px;
-    font-size: 12.5px;
-    color: #3f87b5;
-    text-decoration: none;
+.cell-muted { color: #bbb; }
+
+.status-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+.badge-missing   { background: #fdeaea; color: #c0392b; }
+.badge-submitted { background: #e8f3fb; color: var(--ts-blue); }
+.badge-done      { background: #e9f9ee; color: var(--ts-green); }
+
+/* ---------- Grade form + SAVE BUTTON ---------- */
+.grade-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
 }
 
-.submission-file-link:hover {
-    text-decoration: underline;
+.grade-field {
+    display: inline-flex;
+    align-items: stretch;
+    height: 36px;
+    background: #fff;
+    border: 1px solid #d5dee8;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
 }
+.grade-field:focus-within {
+    border-color: var(--ts-blue);
+    box-shadow: 0 0 0 3px rgba(63,135,181,.15);
+}
+
+.grade-input {
+    width: 54px;
+    height: 100%;
+    text-align: center;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ts-ink);
+    -moz-appearance: textfield;
+}
+.grade-input:focus { outline: none; }
+.grade-input::-webkit-outer-spin-button,
+.grade-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.grade-total {
+    display: flex;
+    align-items: center;
+    padding: 0 11px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ts-muted);
+    background: #f3f6f9;
+    border-left: 1px solid #e3e9f0;
+    white-space: nowrap;
+}
+
+.btn-save {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .2px;
+    color: #fff;
+    background: linear-gradient(180deg, #4b98c8 0%, #3f87b5 100%);
+    border: 1px solid #3578a4;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(47,118,167,.30), inset 0 1px 0 rgba(255,255,255,.20);
+    transition: background .15s, box-shadow .15s, transform .1s;
+}
+.btn-save i { font-size: 12px; }
+.btn-save:hover {
+    background: linear-gradient(180deg, #4390c0 0%, #3479a8 100%);
+    box-shadow: 0 3px 8px rgba(47,118,167,.35), inset 0 1px 0 rgba(255,255,255,.20);
+}
+.btn-save:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
+}
+.btn-save:focus-visible { outline: 3px solid rgba(63,135,181,.35); outline-offset: 2px; }
 
 /* ============================================================
-   CLICKABLE NAME → VIEW SUBMISSION MODAL
+   CLICKABLE NAME
    ============================================================ */
 .student-name-clickable {
     cursor: pointer;
     border-radius: 8px;
     padding: 4px 6px;
     margin: -4px -6px;
-    transition: background 0.15s;
+    text-decoration: none;
+    transition: background .15s;
 }
 .student-name-clickable:hover { background: #f0f6fb; }
-.student-name-clickable:hover span:first-of-type,
-.student-name-clickable:hover > span {
-    color: #3f87b5;
-}
-.student-name-clickable:focus-visible {
-    outline: 2px solid #3f87b5;
-    outline-offset: 2px;
-}
+.student-name-clickable:hover > span { color: var(--ts-blue); }
+.student-name-clickable:focus-visible { outline: 2px solid var(--ts-blue); outline-offset: 2px; }
 
 .attachment-count-badge {
     display: inline-flex;
@@ -331,128 +331,41 @@
     gap: 5px;
     font-size: 11.5px;
     font-weight: 700;
-    color: #3f87b5;
-    background: #eaf3fa;
+    color: var(--ts-blue);
+    background: var(--ts-blue-soft);
     border-radius: 20px;
     padding: 2px 9px;
     flex-shrink: 0;
 }
 
-/* ── Submission viewer modal ── */
-.submission-modal-content {
-    border-radius: 14px;
-    border: none;
-}
-
-.submission-modal-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.submission-modal-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #888;
-    margin-top: 2px;
-}
-
-.submission-modal-attachments {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 320px;
-    overflow-y: auto;
-}
-
-.submission-modal-file {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13.5px;
-    color: #3f87b5;
-    background: #f0f6fb;
-    border: 1px solid #cde0ef;
-    border-radius: 8px;
-    padding: 10px 14px;
-    text-decoration: none;
-    word-break: break-all;
-    transition: background 0.2s;
-}
-.submission-modal-file:hover { background: #daeaf5; color: #2f76a7; }
+/* ---------- Empty state ---------- */
+.empty-state { text-align: center; padding: 36px 12px; color: #9aa7b4; }
+.empty-state i { font-size: 30px; margin-bottom: 8px; display: block; }
+.empty-state p { margin: 0; }
 
 /* ============================================================
    MOBILE
    ============================================================ */
 @media (max-width: 768px) {
+    .submissions-header { gap: 12px; }
+    .submissions-header h2 { font-size: 19px; }
+    .summary-pill { padding: 8px 14px; }
 
-    .submissions-header {
-        gap: 12px;
-    }
+    .instructions-card { padding: 16px 18px; }
+    .instructions-title { font-size: 18px; }
+    .instructions-desc { font-size: 14.5px; }
 
-    .submissions-header h2 {
-        font-size: 19px;
-    }
-
-    .summary-pill {
-        padding: 8px 14px;
-    }
-
-    .instructions-card {
-        padding: 18px;
-    }
-
-    /* ── Keep it a real table, just let it scroll sideways ──
-       .submissions-table-wrap already has overflow-x:auto; giving
-       the table itself a min-width stops columns from being
-       crushed unreadably and turns the overflow into a
-       horizontal swipe instead. */
-    .submissions-table {
-        min-width: 620px;
-    }
-
+    .submissions-table { min-width: 640px; }
     .submissions-table thead th,
-    .submissions-table tbody td {
-        padding: 12px 14px;
-        font-size: 13px;
-    }
-
-    .grade-form {
-        flex-wrap: nowrap;
-    }
+    .submissions-table tbody td { padding: 12px 14px; font-size: 13px; }
 }
 
 @media (max-width: 480px) {
-
-    .submissions-summary {
-        width: 100%;
-    }
-
-    .summary-pill {
-        flex: 1;
-    }
-
-    .submissions-tab {
-        padding: 9px 14px;
-        font-size: 14px;
-    }
-
-    .instructions-card {
-        padding: 16px;
-    }
-
-    .submissions-table {
-        min-width: 560px;
-    }
-
-    .grade-input {
-        width: 52px;
-    }
-
-    .btn-mini {
-        padding: 6px 10px;
-        font-size: 13px;
-    }
+    .submissions-summary { width: 100%; }
+    .summary-pill { flex: 1; }
+    .submissions-tab { padding: 9px 14px; font-size: 14px; }
+    .submissions-table { min-width: 600px; }
+    .grade-input { width: 50px; }
+    .btn-save span { display: none; }   /* icon-only save on tiny screens */
+    .btn-save { padding: 0 13px; }
 }
