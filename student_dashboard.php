@@ -1510,6 +1510,6 @@ document.getElementById('leaveClassModal')
     });
 
 </script>
-
+<script src="student_private_notifications.js"></script>
 </body>
 </html>

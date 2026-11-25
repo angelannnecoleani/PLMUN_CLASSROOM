@@ -655,7 +655,7 @@ $stream = mysqli_stmt_get_result($streamStmt);
     <!-- CLASS NAV -->
     <div class="class-nav">
         <a href="student_class.php?id=<?php echo $class_id; ?>" class="nav-active">Stream</a>
-        <a href="student_assessment.php?id=<?php echo $class_id; ?>">Assignments</a>
+        <a href="student_assessment.php?id=<?php echo $class_id; ?>">Assessments</a>
         <a href="student_material.php?id=<?php echo $class_id; ?>">Materials</a>
         <a href="student_people.php?id=<?php echo $class_id; ?>">People</a>
     </div>

@@ -103,6 +103,7 @@ while ($r = mysqli_fetch_assoc($res)) {
     $items[] = [
         'type'        => $type,
         'id'          => (int)$r['post_id'],
+        'student_id'  => 0,
         'class_name'  => $r['class_name'],
         'sender_name' => $r['sender_name'],
         'title'       => $title,
@@ -113,4 +114,115 @@ while ($r = mysqli_fetch_assoc($res)) {
     ];
 }
 
-echo json_encode(['success' => true, 'items' => $items, 'unread' => $unread]);
+/* ── Private comments from students (one item per thread) ── */
+$pcSql = "
+SELECT
+    a.id AS assessment_id,
+    a.class_id,
+    c.class_name,
+    pc.student_id,
+    su.name AS sender_name,
+    pc.message,
+    pc.created_at,
+    (
+        SELECT COUNT(*)
+        FROM assessment_private_comments unread
+        WHERE unread.assessment_id = pc.assessment_id
+          AND unread.student_id = pc.student_id
+          AND unread.sender_id = pc.student_id
+          AND unread.read_at IS NULL
+    ) AS pc_unread
+FROM (
+    SELECT assessment_id, student_id, MAX(id) AS latest_id
+    FROM assessment_private_comments
+    WHERE sender_id = student_id
+    GROUP BY assessment_id, student_id
+) latest
+INNER JOIN assessment_private_comments pc ON pc.id = latest.latest_id
+INNER JOIN assessments a ON a.id = pc.assessment_id
+INNER JOIN classes c ON c.id = a.class_id
+INNER JOIN users su ON su.id = pc.student_id
+INNER JOIN class_students cst
+    ON cst.class_id = c.id
+   AND cst.student_id = pc.student_id
+   AND cst.archived = 0
+WHERE (
+        c.teacher_id = $tid
+     OR EXISTS (
+            SELECT 1 FROM class_instructors ci
+            WHERE ci.class_id = c.id
+              AND ci.teacher_id = $tid
+        )
+)
+  AND pc.created_at >= (NOW() - INTERVAL 30 DAY)
+ORDER BY pc.created_at DESC
+LIMIT 30
+";
+
+$pcRes = mysqli_query($conn, $pcSql);
+if ($pcRes) {
+    while ($p = mysqli_fetch_assoc($pcRes)) {
+        $msg    = trim((string)$p['message']);
+        $title  = $msg !== '' ? mb_strimwidth($msg, 0, 70, '…') : 'Sent a private comment';
+        $isRead = ((int)$p['pc_unread'] === 0);
+
+        if (!$isRead) $unread++;
+
+        $items[] = [
+            'type'        => 'private',
+            'id'          => (int)$p['assessment_id'],
+            'student_id'  => (int)$p['student_id'],
+            'class_name'  => $p['class_name'],
+            'sender_name' => $p['sender_name'],
+            'title'       => $title,
+            'info'        => null,
+            'created_at'  => $p['created_at'],
+            'is_read'     => $isRead,
+            'url'         => 'assessment_private_comments.php?assessment_id=' . (int)$p['assessment_id']
+                           . '&student_id=' . (int)$p['student_id'],
+        ];
+    }
+}
+
+/* Merge: newest first, keep the latest 30 */
+usort($items, function ($a, $b) {
+    return strcmp((string)$b['created_at'], (string)$a['created_at']);
+});
+$items = array_slice($items, 0, 30);
+
+/* Total unread private comment messages (for the sidebar badge) */
+$privateUnread = 0;
+
+$pcCountSql = "
+SELECT COUNT(*) AS total
+FROM assessment_private_comments pc
+INNER JOIN assessments a ON a.id = pc.assessment_id
+INNER JOIN classes cl ON cl.id = a.class_id
+INNER JOIN class_students cst
+    ON cst.class_id = cl.id
+   AND cst.student_id = pc.student_id
+   AND cst.archived = 0
+WHERE pc.sender_id = pc.student_id
+  AND pc.read_at IS NULL
+  AND (
+        cl.teacher_id = $tid
+     OR EXISTS (
+            SELECT 1 FROM class_instructors ci
+            WHERE ci.class_id = cl.id
+              AND ci.teacher_id = $tid
+        )
+  )
+";
+
+$pcCountRes = mysqli_query($conn, $pcCountSql);
+if ($pcCountRes) {
+    $pcRow = mysqli_fetch_assoc($pcCountRes);
+    $privateUnread = (int)($pcRow['total'] ?? 0);
+}
+
+echo json_encode([
+    'success'        => true,
+    'items'          => array_values($items),
+    'unread'         => $unread,
+    'private_unread' => $privateUnread
+]);

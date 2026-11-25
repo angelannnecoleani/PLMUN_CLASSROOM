@@ -55,6 +55,45 @@ if (!$user) {
 }
 
 /* =========================================
+   NEW: UNREAD PRIVATE COMMENTS (sidebar badge)
+   Counts unread messages sent by students in
+   classes where this teacher is the main
+   teacher or an assigned instructor.
+========================================= */
+$privateUnread = 0;
+
+$pcStmt = mysqli_prepare(
+    $conn,
+    "SELECT COUNT(*) AS cnt
+     FROM assessment_private_comments pc
+     INNER JOIN assessments a
+        ON a.id = pc.assessment_id
+     INNER JOIN classes c
+        ON c.id = a.class_id
+     WHERE pc.sender_id = pc.student_id
+       AND pc.read_at IS NULL
+       AND (
+            c.teacher_id = ?
+            OR EXISTS (
+                SELECT 1
+                FROM class_instructors ci
+                WHERE ci.class_id = c.id
+                  AND ci.teacher_id = ?
+            )
+       )"
+);
+
+if ($pcStmt) {
+    mysqli_stmt_bind_param($pcStmt, "ii", $teacher_id, $teacher_id);
+    mysqli_stmt_execute($pcStmt);
+
+    $pcRow = mysqli_fetch_assoc(mysqli_stmt_get_result($pcStmt));
+    $privateUnread = (int)($pcRow['cnt'] ?? 0);
+
+    mysqli_stmt_close($pcStmt);
+}
+
+/* =========================================
    SEARCH
 ========================================= */
 $search = trim($_GET['search'] ?? '');
@@ -325,6 +364,46 @@ $hasProfileImage = !empty($profileFile)
     <link rel="stylesheet" href="teacher_dashboard.css">
     <link rel="stylesheet" href="notifications.css">
 
+    <!-- NEW: styles for the Private Comments sidebar badge -->
+    <style>
+        .sidebar ul li a.has-nav-badge {
+            position: relative;
+        }
+
+        .pc-nav-badge {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            border-radius: 999px;
+            background: #e8590c;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 22px;
+            text-align: center;
+        }
+
+        .pc-nav-badge.d-none {
+            display: none !important;
+        }
+
+        /* When the sidebar is collapsed, show a small badge on the icon. */
+        .sidebar.collapsed .pc-nav-badge {
+            right: 8px;
+            top: 8px;
+            transform: none;
+            min-width: 17px;
+            height: 17px;
+            padding: 0 4px;
+            font-size: 10px;
+            line-height: 17px;
+        }
+    </style>
+
 </head>
 
 <body>
@@ -392,6 +471,18 @@ $hasProfileImage = !empty($profileFile)
             </a>
         </li>
 
+        <!-- NEW: Private Comments item with the unread badge -->
+        <li>
+            <a href="teacher_assessment_comments.php" class="has-nav-badge">
+                <i class="fa-solid fa-comments"></i>
+                <span>Private Comments</span>
+
+                <b
+                    class="pc-nav-badge<?php echo $privateUnread > 0 ? '' : ' d-none'; ?>"
+                    data-pc-badge
+                ><?php echo $privateUnread > 99 ? '99+' : $privateUnread; ?></b>
+            </a>
+        </li>
 
     </ul>
 

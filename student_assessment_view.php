@@ -1,4 +1,3 @@
-
 <?php
 session_start();
 require_once 'database.php';
@@ -17,14 +16,14 @@ if (
 }
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("Assessment not found");
+    die("Assessment not found: no valid id in the URL. Received: " . htmlspecialchars((string)($_GET['id'] ?? 'nothing')));
 }
 
 $assessment_id = (int) $_GET['id'];
 $student_id    = (int) $_SESSION['user_id'];
 
 if ($assessment_id <= 0) {
-    die("Assessment not found");
+    die("Assessment not found: invalid id " . (int)$assessment_id . ".");
 }
 
 /* =========================================
@@ -150,6 +149,7 @@ $assessmentSQL = "
         assessments.*,
         classes.class_name,
         classes.id AS class_id,
+        classes.teacher_id AS class_teacher_id,
         $authorSelect
     FROM assessments
     INNER JOIN classes
@@ -176,10 +176,11 @@ $assessment = mysqli_fetch_assoc($assessmentResult);
 mysqli_stmt_close($aq);
 
 if (!$assessment) {
-    die("Assessment not found");
+    die("Assessment not found: there is no assessment with id " . (int)$assessment_id . ". Check that the link uses the assessment id, not the class id.");
 }
 
-$class_id = (int) $assessment['class_id'];
+$class_id        = (int) $assessment['class_id'];
+$classTeacherId  = (int) ($assessment['class_teacher_id'] ?? 0);
 
 /* =========================================
    CONFIRM ACTIVE STUDENT ENROLLMENT
@@ -209,6 +210,166 @@ mysqli_stmt_close($check);
 if (!$isEnrolled) {
     http_response_code(403);
     die("Access denied. You are not actively enrolled in this class.");
+}
+
+/* =========================================
+   PRIVATE COMMENTS: HELPERS
+========================================= */
+
+if (!function_exists('pc_initials')) {
+    function pc_initials($name) {
+        $name = trim((string)$name);
+
+        if ($name === '') {
+            return '?';
+        }
+
+        $parts = preg_split('/\s+/', $name);
+        $first = mb_strtoupper(mb_substr($parts[0], 0, 1));
+        $last  = count($parts) > 1
+            ? mb_strtoupper(mb_substr(end($parts), 0, 1))
+            : '';
+
+        return $first . $last;
+    }
+}
+
+if (!function_exists('pc_avatar_color')) {
+    function pc_avatar_color($id) {
+        $colors = [
+            '#1a73e8', '#188038', '#d93025', '#e37400',
+            '#9334e6', '#12b5cb', '#c5221f', '#5f6368'
+        ];
+
+        return $colors[((int)$id) % count($colors)];
+    }
+}
+
+if (!function_exists('pc_date')) {
+    function pc_date($datetime) {
+        $ts = strtotime($datetime);
+
+        if (date('Y', $ts) === date('Y')) {
+            return date('M j', $ts);
+        }
+
+        return date('M j, Y', $ts);
+    }
+}
+
+/* Escapes the text, keeps line breaks, and turns links into clickable links. */
+if (!function_exists('pc_format_text')) {
+    function pc_format_text($text) {
+        $safe = htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8');
+
+        $safe = preg_replace(
+            '~(https?://[^\s<]+)~i',
+            '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+            $safe
+        );
+
+        return nl2br($safe);
+    }
+}
+
+/* Returns a valid profile image filename, or an empty string. */
+if (!function_exists('pc_profile_image')) {
+    function pc_profile_image($raw) {
+        $raw = trim((string)$raw);
+
+        if ($raw === '') {
+            return '';
+        }
+
+        $name = basename($raw);
+
+        if (in_array(
+            strtolower($name),
+            ['default.png', 'default.jpg', 'default.jpeg', 'default.svg', 'null'],
+            true
+        )) {
+            return '';
+        }
+
+        $path = __DIR__ . '/uploads/' . $name;
+
+        return (is_file($path) && is_readable($path)) ? $name : '';
+    }
+}
+
+/* =========================================
+   PRIVATE COMMENTS: CSRF TOKEN
+========================================= */
+
+if (empty($_SESSION['private_comment_token'])) {
+    $_SESSION['private_comment_token'] = bin2hex(random_bytes(32));
+}
+
+/* =========================================
+   PRIVATE COMMENTS: SEND A COMMENT
+========================================= */
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    ($_POST['action'] ?? '') === 'private_comment'
+) {
+
+    $token = $_POST['csrf_token'] ?? '';
+
+    if (!hash_equals($_SESSION['private_comment_token'], $token)) {
+        http_response_code(403);
+        die('Invalid request token. Please refresh the page.');
+    }
+
+    $pcMessage = trim((string)($_POST['message'] ?? ''));
+
+    if ($pcMessage === '') {
+
+        $_SESSION['comment_error'] = 'Please enter a message.';
+
+    } elseif (mb_strlen($pcMessage) > 5000) {
+
+        $_SESSION['comment_error'] = 'Message cannot exceed 5,000 characters.';
+
+    } elseif ($classTeacherId < 1) {
+
+        $_SESSION['comment_error'] = 'No instructor is assigned to this class yet.';
+
+    } else {
+
+        $ins = mysqli_prepare($conn, "
+            INSERT INTO assessment_private_comments
+                (assessment_id, student_id, sender_id, message)
+            VALUES (?, ?, ?, ?)
+        ");
+
+        if (!$ins) {
+            http_response_code(500);
+            die('Unable to prepare message. Please try again.');
+        }
+
+        mysqli_stmt_bind_param(
+            $ins,
+            "iiis",
+            $assessment_id,
+            $student_id,
+            $student_id,
+            $pcMessage
+        );
+
+        if (!mysqli_stmt_execute($ins)) {
+            mysqli_stmt_close($ins);
+            http_response_code(500);
+            die('Unable to send message. Please try again.');
+        }
+
+        mysqli_stmt_close($ins);
+
+        $_SESSION['comment_success'] = 'Private comment posted.';
+    }
+
+    header("Location: student_assessment_view.php?id=" . $assessment_id . "#privateComments");
+    exit();
 }
 
 /* =========================================
@@ -263,6 +424,59 @@ if ($hasSubmissionRow) {
         mysqli_stmt_close($saq);
     }
 }
+
+/* =========================================
+   PRIVATE COMMENTS: MARK AS READ + LOAD
+========================================= */
+
+$rd = mysqli_prepare($conn, "
+    UPDATE assessment_private_comments
+    SET read_at = NOW()
+    WHERE assessment_id = ?
+      AND student_id = ?
+      AND sender_id != ?
+      AND read_at IS NULL
+");
+
+if ($rd) {
+    mysqli_stmt_bind_param($rd, "iii", $assessment_id, $student_id, $student_id);
+    mysqli_stmt_execute($rd);
+    mysqli_stmt_close($rd);
+}
+
+$privateComments = [];
+
+$pcq = mysqli_prepare($conn, "
+    SELECT
+        pc.id,
+        pc.sender_id,
+        pc.message,
+        pc.created_at,
+        u.name AS sender_name,
+        u.profile_image AS sender_image
+    FROM assessment_private_comments pc
+    INNER JOIN users u ON u.id = pc.sender_id
+    WHERE pc.assessment_id = ?
+      AND pc.student_id = ?
+    ORDER BY pc.created_at ASC, pc.id ASC
+");
+
+if ($pcq) {
+    mysqli_stmt_bind_param($pcq, "ii", $assessment_id, $student_id);
+    mysqli_stmt_execute($pcq);
+
+    $privateComments = mysqli_stmt_get_result($pcq)
+        ->fetch_all(MYSQLI_ASSOC);
+
+    mysqli_stmt_close($pcq);
+}
+
+$pcCount = count($privateComments);
+
+$pcSuccess = $_SESSION['comment_success'] ?? '';
+$pcError   = $_SESSION['comment_error'] ?? '';
+
+unset($_SESSION['comment_success'], $_SESSION['comment_error']);
 
 /* =========================================
    TEACHER-ADDED ASSESSMENT ATTACHMENTS
@@ -553,6 +767,187 @@ if (!function_exists('attachment_icon')) {
             .assess-img-grid img { height: 110px; }
             .assess-attach-item { padding: 10px 12px; font-size: 13.5px; }
         }
+
+        /* ── Private comments card (Google Classroom style) ── */
+        .pc-card {
+            background: #f0f4f9;
+            border-radius: 16px;
+            padding: 22px 22px 18px;
+            margin-top: 16px;
+            color: #1f1f1f;
+            scroll-margin-top: 90px;
+        }
+
+        .pc-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 17px;
+            font-weight: 500;
+            color: #1f1f1f;
+            margin-bottom: 18px;
+        }
+
+        .pc-head i {
+            font-size: 19px;
+            color: #444746;
+            width: 24px;
+            text-align: center;
+        }
+
+        .pc-flash {
+            font-size: 13px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pc-flash.success { background: #e6f4ea; color: #137333; }
+        .pc-flash.error   { background: #fce8e6; color: #c5221f; }
+
+        .pc-list {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .pc-comment {
+            display: flex;
+            gap: 14px;
+        }
+
+        .pc-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 500;
+            overflow: hidden;
+        }
+
+        .pc-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .pc-body {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .pc-meta {
+            font-size: 15px;
+            color: #1f1f1f;
+            line-height: 1.35;
+            margin-bottom: 4px;
+        }
+
+        .pc-meta .pc-name { font-weight: 500; }
+        .pc-meta .pc-sep  { margin: 0 4px; color: #444746; }
+        .pc-meta .pc-date { color: #444746; }
+
+        .pc-text {
+            font-size: 15px;
+            line-height: 1.55;
+            color: #1f1f1f;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .pc-text a {
+            color: #0b57d0;
+            text-decoration: underline;
+        }
+
+        .pc-text a:hover { color: #0842a0; }
+
+        .pc-form {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pc-input-wrap {
+            flex: 1;
+            min-width: 0;
+            border: 1px solid #c4c7c5;
+            border-radius: 28px;
+            background: #f0f4f9;
+            padding: 0 18px;
+            transition: border-color .15s, box-shadow .15s, background .15s;
+        }
+
+        .pc-input-wrap:hover { background: #ebeff5; }
+
+        .pc-input-wrap:focus-within {
+            background: #fff;
+            border-color: #0b57d0;
+            box-shadow: 0 0 0 1px #0b57d0;
+        }
+
+        .pc-input-wrap textarea {
+            display: block;
+            width: 100%;
+            border: none;
+            outline: none;
+            resize: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #1f1f1f;
+            padding: 14px 0;
+            min-height: 52px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .pc-input-wrap textarea::placeholder { color: #444746; }
+
+        .pc-send {
+            width: 44px;
+            height: 44px;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: #747775;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background .15s, color .15s;
+        }
+
+        .pc-send:not(:disabled) { color: #0b57d0; }
+
+        .pc-send:hover:not(:disabled) { background: #dde3ea; }
+
+        .pc-send:disabled { cursor: default; }
+
+        .pc-note {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #444746;
+            margin: 16px 0 0;
+            padding-right: 52px;
+        }
+
+        @media (max-width: 576px) {
+            .pc-card { padding: 18px 16px 16px; }
+            .pc-note { padding-right: 0; }
+        }
     </style>
 </head>
 <body>
@@ -724,7 +1119,7 @@ if (!function_exists('attachment_icon')) {
                 </div>
             </div>
 
-            <!-- RIGHT: YOUR WORK -->
+            <!-- RIGHT: YOUR WORK + PRIVATE COMMENTS -->
             <div class="col-lg-4">
                 <div class="assess-panel your-work-panel">
 
@@ -807,6 +1202,119 @@ if (!function_exists('attachment_icon')) {
                     <div id="yourWorkMsg" class="small mt-2"></div>
 
                 </div>
+
+                <!-- PRIVATE COMMENTS -->
+                <div class="pc-card" id="privateComments">
+
+                    <div class="pc-head">
+                        <i class="fa-regular fa-user"></i>
+                        <span>
+                            <?php
+                                if ($pcCount === 0) {
+                                    echo 'Private comments';
+                                } elseif ($pcCount === 1) {
+                                    echo '1 private comment';
+                                } else {
+                                    echo $pcCount . ' private comments';
+                                }
+                            ?>
+                        </span>
+                    </div>
+
+                    <?php if ($pcSuccess): ?>
+                        <div class="pc-flash success" role="status">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <?php echo htmlspecialchars($pcSuccess); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($pcError): ?>
+                        <div class="pc-flash error" role="alert">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <?php echo htmlspecialchars($pcError); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($privateComments)): ?>
+                        <div class="pc-list" id="pcList">
+
+                            <?php foreach ($privateComments as $pc): ?>
+
+                                <?php $pcImg = pc_profile_image($pc['sender_image'] ?? ''); ?>
+
+                                <div class="pc-comment">
+
+                                    <div class="pc-avatar"
+                                         style="background: <?php echo htmlspecialchars(pc_avatar_color($pc['sender_id'])); ?>;"
+                                         aria-hidden="true">
+
+                                        <?php if ($pcImg !== ''): ?>
+                                            <img src="uploads/<?php echo rawurlencode($pcImg); ?>"
+                                                 alt=""
+                                                 onerror="this.remove();">
+                                        <?php endif; ?>
+
+                                        <?php if ($pcImg === ''): ?>
+                                            <?php echo htmlspecialchars(pc_initials($pc['sender_name'])); ?>
+                                        <?php endif; ?>
+
+                                    </div>
+
+                                    <div class="pc-body">
+
+                                        <div class="pc-meta">
+                                            <span class="pc-name"><?php echo htmlspecialchars($pc['sender_name']); ?></span>
+                                            <span class="pc-sep">&bull;</span>
+                                            <span class="pc-date"><?php echo htmlspecialchars(pc_date($pc['created_at'])); ?></span>
+                                        </div>
+
+                                        <div class="pc-text">
+                                            <?php echo pc_format_text($pc['message']); ?>
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            <?php endforeach; ?>
+
+                        </div>
+                    <?php endif; ?>
+
+                    <form method="POST" action="student_assessment_view.php?id=<?php echo $assessment_id; ?>" id="pcForm">
+
+                        <input type="hidden" name="action" value="private_comment">
+                        <input type="hidden" name="csrf_token"
+                               value="<?php echo htmlspecialchars($_SESSION['private_comment_token']); ?>">
+
+                        <div class="pc-form">
+
+                            <div class="pc-input-wrap">
+                                <textarea
+                                    name="message"
+                                    id="pcInput"
+                                    rows="1"
+                                    maxlength="5000"
+                                    placeholder="Add private comment..."
+                                    aria-label="Add private comment"
+                                    required></textarea>
+                            </div>
+
+                            <button type="submit" class="pc-send" id="pcSend"
+                                    aria-label="Post private comment" disabled>
+                                <i class="fa-regular fa-paper-plane"></i>
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                    <p class="pc-note">
+                        Private comments are only visible to you and your teachers
+                    </p>
+
+                </div>
+
             </div>
 
         </div>
@@ -865,6 +1373,48 @@ window.addEventListener('resize', function() {
         closeMobileSidebar();
     }
 });
+
+/* ── Private comments box ── */
+(function () {
+    const form  = document.getElementById('pcForm');
+    const input = document.getElementById('pcInput');
+    const send  = document.getElementById('pcSend');
+
+    if (!form || !input || !send) return;
+
+    function autoGrow() {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+    }
+
+    function updateState() {
+        send.disabled = input.value.trim().length === 0;
+    }
+
+    input.addEventListener('input', function () {
+        autoGrow();
+        updateState();
+    });
+
+    // Enter posts the comment. Shift + Enter adds a new line.
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+
+            if (!send.disabled) {
+                form.requestSubmit();
+            }
+        }
+    });
+
+    // Prevent double posts.
+    form.addEventListener('submit', function () {
+        send.disabled = true;
+    });
+
+    autoGrow();
+    updateState();
+})();
 
 (function () {
     const ASSESSMENT_ID    = <?php echo json_encode($assessment_id); ?>;

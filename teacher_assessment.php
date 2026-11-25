@@ -130,7 +130,7 @@ $aStmt = mysqli_prepare($conn, "
 
     FROM assessments a
     WHERE a.class_id = ?
-    ORDER BY a.type ASC, a.id DESC
+    ORDER BY a.id DESC
 ");
 
 if (!$aStmt) {
@@ -143,16 +143,74 @@ mysqli_stmt_execute($aStmt);
 $assessmentResult = mysqli_stmt_get_result($aStmt);
 
 /* =====================================================
-   GROUP ASSESSMENTS BY TYPE
+   GROUP ASSESSMENTS BY TOPIC
+   Newest topic first. Assessments with no topic go into
+   "No topic" (last).
 ===================================================== */
 
-$grouped = [];
+$named       = [];   // topic key => ['name' => ..., 'items' => [...]]
+$unassigned  = [];
 
 while ($a = mysqli_fetch_assoc($assessmentResult)) {
-    $grouped[$a['type']][] = $a;
+
+    $topicName = trim((string)($a['topic'] ?? ''));
+
+    if ($topicName === '') {
+        $unassigned[] = $a;
+        continue;
+    }
+
+    $key = 't:' . mb_strtolower($topicName, 'UTF-8');
+
+    if (!isset($named[$key])) {
+        $named[$key] = ['name' => $topicName, 'items' => []];
+    }
+
+    $named[$key]['items'][] = $a;
 }
 
 mysqli_stmt_close($aStmt);
+
+$groups = array_values($named);
+
+if (!empty($unassigned)) {
+    $groups[] = ['name' => 'No topic', 'items' => $unassigned];
+}
+
+/* =====================================================
+   EXISTING TOPICS (for the Topic dropdown in the modal)
+===================================================== */
+
+$topics = [];
+
+try {
+
+    $tStmt = mysqli_prepare($conn, "
+        SELECT DISTINCT topic
+        FROM assessments
+        WHERE class_id = ?
+          AND topic IS NOT NULL
+          AND topic <> ''
+        ORDER BY topic ASC
+    ");
+
+    if ($tStmt) {
+
+        mysqli_stmt_bind_param($tStmt, "i", $class_id);
+        mysqli_stmt_execute($tStmt);
+
+        $tResult = mysqli_stmt_get_result($tStmt);
+
+        while ($t = mysqli_fetch_assoc($tResult)) {
+            $topics[] = $t['topic'];
+        }
+
+        mysqli_stmt_close($tStmt);
+    }
+
+} catch (Throwable $ex) {
+    $topics = [];
+}
 
 /* Escape helper */
 function e($value) {
@@ -264,21 +322,136 @@ function e($value) {
             flex-shrink: 0;
         }
 
-        .topic-filter {
-            height: 52px;
-            min-width: 220px;
-            border: 1px solid #dde4ec;
-            border-radius: 10px;
-            background: #fff;
+        /* =====================================================
+           TOPIC FILTER (Google Classroom style)
+        ===================================================== */
+
+        .topic-filter-wrap {
+            position: relative;
+            width: 320px;
+            max-width: 100%;
+            margin-left: 8px;
+        }
+
+        .topic-filter-btn {
+            position: relative;
+            width: 100%;
+            height: 56px;
+            padding: 0 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 18px;
+            gap: 10px;
+            background: #fff;
+            border: 1px solid #747775;
+            border-radius: 6px;
+            font-size: 16px;
+            color: #1f1f1f;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .topic-filter-btn:hover {
+            border-color: #1f1f1f;
+        }
+
+        .topic-filter-btn:focus-visible,
+        .topic-filter-btn.open {
+            outline: none;
+            border-color: #0b57d0;
+            box-shadow: 0 0 0 1px #0b57d0;
+        }
+
+        /* Floating label sitting on the border */
+        .topic-filter-label {
+            position: absolute;
+            top: -9px;
+            left: 12px;
+            padding: 0 4px;
+            background: #fff;
+            font-size: 12px;
+            line-height: 16px;
+            color: #444746;
+        }
+
+        .topic-filter-btn:focus-visible .topic-filter-label,
+        .topic-filter-btn.open .topic-filter-label {
+            color: #0b57d0;
+        }
+
+        .topic-filter-value {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topic-filter-btn > i {
+            font-size: 14px;
+            color: #444746;
+            transition: transform 0.15s;
+        }
+
+        .topic-filter-btn.open > i {
+            color: #0b57d0;
+            transform: rotate(180deg);
+        }
+
+        .topic-filter-menu {
+            position: absolute;
+            top: calc(100% + 2px);
+            left: 0;
+            right: 0;
+            max-height: 320px;
+            overflow-y: auto;
+            padding: 8px 0;
+            background: #f3f6fc;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px 2px rgba(60, 64, 67, 0.15),
+                        0 1px 2px rgba(60, 64, 67, 0.3);
+            z-index: 50;
+        }
+
+        .topic-filter-menu[hidden] {
+            display: none;
+        }
+
+        .topic-filter-option {
+            padding: 16px 24px;
+            font-size: 16px;
+            color: #1f1f1f;
+            cursor: pointer;
+            overflow-wrap: anywhere;
+        }
+
+        .topic-filter-option:hover {
+            background: #e6eaf1;
+        }
+
+        .topic-filter-option.selected {
+            background: #dfe3ea;
+        }
+
+        .collapse-all-btn {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: none;
+            border: none;
+            border-radius: 20px;
+            color: #0b57d0;
             font-size: 15px;
             font-weight: 500;
-            color: #333;
             cursor: pointer;
-            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .collapse-all-btn:hover {
+            background: #e8f0fe;
         }
 
         /* =====================================================
@@ -310,6 +483,13 @@ function e($value) {
         .topic-name {
             min-width: 0;
             overflow-wrap: anywhere;
+        }
+
+        .topic-count {
+            font-size: 13px;
+            color: #888;
+            font-weight: 400;
+            margin-left: 6px;
         }
 
         .topic-option-btn {
@@ -397,6 +577,16 @@ function e($value) {
 
         .assessment-title-link:hover {
             color: #3f87b5;
+        }
+
+        .type-badge {
+            flex-shrink: 0;
+            padding: 2px 10px;
+            border-radius: 999px;
+            background: #e8f1f8;
+            color: #2f76a7;
+            font-size: 12px;
+            font-weight: 600;
         }
 
         .assessment-due-wrap {
@@ -591,6 +781,86 @@ function e($value) {
 
         .link-add-btn:hover {
             background: #2f76a7;
+        }
+
+        /* =====================================================
+           TOPIC DROPDOWN (inside the modal)
+        ===================================================== */
+
+        .topic-combo {
+            position: relative;
+        }
+
+        .topic-menu {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            margin-top: 4px;
+            background: #fff;
+            border: 1px solid #dde4ec;
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 30;
+        }
+
+        .topic-menu[hidden] {
+            display: none;
+        }
+
+        .topic-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .topic-option:hover,
+        .topic-option.active {
+            background: #f1f5f9;
+        }
+
+        .topic-option i {
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        .topic-option.new {
+            color: #2f76a7;
+            font-weight: 600;
+        }
+
+        .topic-option.new i {
+            color: #3f87b5;
+        }
+
+        /* =====================================================
+           DATE ERROR
+        ===================================================== */
+
+        .date-error {
+            display: none;
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #fdecea;
+            border: 1px solid #f5c2c0;
+            color: #b3261e;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .date-error.show {
+            display: block;
+        }
+
+        .date-error i {
+            margin-right: 6px;
         }
 
         /* =====================================================
@@ -919,13 +1189,22 @@ function e($value) {
             .assessment-actions {
                 flex-direction: column;
                 align-items: stretch;
-                gap: 10px;
+                gap: 14px;
                 margin-bottom: 18px;
             }
 
-            .create-btn,
-            .topic-filter {
+            .create-btn {
                 width: 100%;
+            }
+
+            .topic-filter-wrap {
+                width: 100%;
+                margin-left: 0;
+            }
+
+            .collapse-all-btn {
+                margin-left: 0;
+                align-self: flex-end;
             }
 
             .create-btn {
@@ -967,6 +1246,7 @@ function e($value) {
             .assessment-title-wrap {
                 gap: 9px;
                 align-items: flex-start;
+                flex-wrap: wrap;
             }
 
             .assessment-title-link {
@@ -1480,9 +1760,66 @@ function e($value) {
                 Create
             </button>
 
+            <?php if (!empty($groups)): ?>
+
+                <!-- TOPIC FILTER (Google Classroom style) -->
+                <div class="topic-filter-wrap" id="topicFilterWrap">
+
+                    <button
+                        type="button"
+                        class="topic-filter-btn"
+                        id="topicFilterBtn"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                    >
+                        <span class="topic-filter-label">Topic filter</span>
+                        <span class="topic-filter-value" id="topicFilterValue">All topics</span>
+                        <i class="fa-solid fa-caret-down"></i>
+                    </button>
+
+                    <div
+                        class="topic-filter-menu"
+                        id="topicFilterMenu"
+                        role="listbox"
+                        hidden
+                    >
+
+                        <div
+                            class="topic-filter-option selected"
+                            role="option"
+                            data-value="all"
+                        >
+                            All topics
+                        </div>
+
+                        <?php foreach ($groups as $gi => $g): ?>
+                            <div
+                                class="topic-filter-option"
+                                role="option"
+                                data-value="<?php echo (int)$gi; ?>"
+                            >
+                                <?php echo e($g['name']); ?>
+                            </div>
+                        <?php endforeach; ?>
+
+                    </div>
+
+                </div>
+
+                <button
+                    type="button"
+                    class="collapse-all-btn"
+                    id="collapseAllBtn"
+                >
+                    <i class="fa-solid fa-angles-up" id="collapseAllIcon"></i>
+                    <span id="collapseAllText">Collapse all</span>
+                </button>
+
+            <?php endif; ?>
+
         </div>
 
-        <?php if (empty($grouped)): ?>
+        <?php if (empty($groups)): ?>
 
             <div class="assessment-empty">
 
@@ -1497,11 +1834,11 @@ function e($value) {
 
         <?php else: ?>
 
-            <?php foreach ($grouped as $type => $assessments): ?>
+            <?php foreach ($groups as $gi => $group): ?>
 
                 <div
                     class="topic-block mb-3"
-                    id="group-<?php echo e($type); ?>"
+                    id="group-<?php echo (int)$gi; ?>"
                 >
 
                     <div class="topic-header-bar">
@@ -1510,13 +1847,16 @@ function e($value) {
 
                             <button
                                 class="topic-collapse-btn"
-                                onclick="toggleGroup('body-<?php echo e($type); ?>', this)"
+                                onclick="toggleGroup('body-<?php echo (int)$gi; ?>', this)"
                             >
                                 <i class="fa-solid fa-chevron-down"></i>
                             </button>
 
                             <span class="topic-name">
-                                <?php echo e($type); ?>
+                                <?php echo e($group['name']); ?>
+                                <span class="topic-count">
+                                    (<?php echo count($group['items']); ?>)
+                                </span>
                             </span>
 
                         </div>
@@ -1538,10 +1878,10 @@ function e($value) {
                                     <a
                                         class="dropdown-item"
                                         href="#"
-                                        onclick="event.preventDefault(); filterByType(<?php echo htmlspecialchars(json_encode($type), ENT_QUOTES, 'UTF-8'); ?>)"
+                                        onclick="event.preventDefault(); filterByTopic('<?php echo (int)$gi; ?>')"
                                     >
                                         <i class="fa-solid fa-filter me-2"></i>
-                                        Show only this type
+                                        Show only this topic
                                     </a>
                                 </li>
 
@@ -1552,7 +1892,7 @@ function e($value) {
                                         onclick="event.preventDefault(); showAllGroups()"
                                     >
                                         <i class="fa-solid fa-list me-2"></i>
-                                        Show all types
+                                        Show all topics
                                     </a>
                                 </li>
 
@@ -1564,10 +1904,10 @@ function e($value) {
 
                     <div
                         class="topic-body"
-                        id="body-<?php echo e($type); ?>"
+                        id="body-<?php echo (int)$gi; ?>"
                     >
 
-                        <?php foreach ($assessments as $assessment): ?>
+                        <?php foreach ($group['items'] as $assessment): ?>
 
                             <div class="assessment-item">
 
@@ -1583,6 +1923,12 @@ function e($value) {
                                         >
                                             <?php echo e($assessment['title']); ?>
                                         </a>
+
+                                        <?php if (!empty($assessment['type'])): ?>
+                                            <span class="type-badge">
+                                                <?php echo e($assessment['type']); ?>
+                                            </span>
+                                        <?php endif; ?>
 
                                     </div>
 
@@ -1754,14 +2100,19 @@ function e($value) {
 
                 <div class="modal-body pt-3">
 
-                    <div class="mb-3">
+                    <div class="mb-3 topic-combo" id="topicCombo">
 
                         <input
                             type="text"
                             name="topic"
+                            id="topicInput"
                             class="form-control assessment-input"
                             placeholder="Topic"
+                            maxlength="100"
+                            autocomplete="off"
                         >
+
+                        <div id="topicMenu" class="topic-menu" hidden></div>
 
                     </div>
 
@@ -2036,6 +2387,8 @@ function e($value) {
 
                     </div>
 
+                    <div id="dateError" class="date-error" role="alert"></div>
+
                 </div>
 
                 <div class="modal-footer border-0 pt-2">
@@ -2073,6 +2426,7 @@ function e($value) {
 
 <script>
 const CLASS_ID = <?php echo json_encode($class_id); ?>;
+const EXISTING_TOPICS = <?php echo json_encode($topics, JSON_UNESCAPED_UNICODE); ?>;
 
 /* =========================================================
    RESPONSIVE SIDEBAR
@@ -2135,24 +2489,178 @@ function toggleGroup(bodyId, btn) {
 
     icon.classList.toggle('fa-chevron-down');
     icon.classList.toggle('fa-chevron-right');
+
+    updateCollapseAllButton();
+}
+
+/* Collapse all / Expand all */
+
+function updateCollapseAllButton() {
+
+    var btnText = document.getElementById('collapseAllText');
+    var btnIcon = document.getElementById('collapseAllIcon');
+
+    if (!btnText || !btnIcon) {
+        return;
+    }
+
+    var bodies = document.querySelectorAll('.topic-body');
+
+    var allCollapsed = bodies.length > 0 &&
+        Array.prototype.every.call(bodies, function(b) {
+            return b.classList.contains('collapsed');
+        });
+
+    btnText.textContent = allCollapsed ? 'Expand all' : 'Collapse all';
+
+    btnIcon.className = allCollapsed
+        ? 'fa-solid fa-angles-down'
+        : 'fa-solid fa-angles-up';
+}
+
+function setAllGroupsCollapsed(collapsed) {
+
+    document.querySelectorAll('.topic-block').forEach(function(block) {
+
+        var body = block.querySelector('.topic-body');
+        var icon = block.querySelector('.topic-collapse-btn i');
+
+        if (!body) {
+            return;
+        }
+
+        body.classList.toggle('collapsed', collapsed);
+
+        if (icon) {
+            icon.classList.toggle('fa-chevron-right', collapsed);
+            icon.classList.toggle('fa-chevron-down', !collapsed);
+        }
+    });
+
+    updateCollapseAllButton();
 }
 
 /* =========================================================
-   TOPIC FILTER
+   TOPIC FILTER (Google Classroom style)
 ========================================================= */
 
-function filterByType(type) {
+function setFilterLabel(value) {
+
+    var valueEl = document.getElementById('topicFilterValue');
+    var menu    = document.getElementById('topicFilterMenu');
+
+    if (!valueEl || !menu) {
+        return;
+    }
+
+    var label = 'All topics';
+
+    menu.querySelectorAll('.topic-filter-option').forEach(function(opt) {
+
+        var isSelected = opt.dataset.value === String(value);
+
+        opt.classList.toggle('selected', isSelected);
+
+        if (isSelected) {
+            label = opt.textContent.trim();
+        }
+    });
+
+    valueEl.textContent = label;
+}
+
+function filterByTopic(value) {
+
+    if (value === 'all') {
+        showAllGroups();
+        return;
+    }
+
+    setFilterLabel(value);
+
     document.querySelectorAll('.topic-block').forEach(function(block) {
         block.style.display =
-            block.id === 'group-' + type ? 'block' : 'none';
+            block.id === 'group-' + value ? 'block' : 'none';
     });
 }
 
 function showAllGroups() {
+
+    setFilterLabel('all');
+
     document.querySelectorAll('.topic-block').forEach(function(block) {
         block.style.display = 'block';
     });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+
+    var btn  = document.getElementById('topicFilterBtn');
+    var menu = document.getElementById('topicFilterMenu');
+    var wrap = document.getElementById('topicFilterWrap');
+
+    function closeMenu() {
+        if (!menu) {
+            return;
+        }
+        menu.hidden = true;
+        btn.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu() {
+        menu.hidden = false;
+        btn.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+    }
+
+    if (btn && menu && wrap) {
+
+        btn.addEventListener('click', function() {
+            if (menu.hidden) {
+                openMenu();
+            } else {
+                closeMenu();
+            }
+        });
+
+        menu.querySelectorAll('.topic-filter-option').forEach(function(opt) {
+            opt.addEventListener('click', function() {
+                filterByTopic(opt.dataset.value);
+                closeMenu();
+            });
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!wrap.contains(e.target)) {
+                closeMenu();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMenu();
+            }
+        });
+    }
+
+    var collapseBtn = document.getElementById('collapseAllBtn');
+
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', function() {
+
+            var bodies = document.querySelectorAll('.topic-body');
+
+            var allCollapsed = bodies.length > 0 &&
+                Array.prototype.every.call(bodies, function(b) {
+                    return b.classList.contains('collapsed');
+                });
+
+            setAllGroupsCollapsed(!allCollapsed);
+        });
+    }
+
+});
 
 /* =========================================================
    DELETE ASSESSMENT AND CUSTOM POINTS
@@ -2194,6 +2702,164 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 });
+
+/* =========================================================
+   TOPIC DROPDOWN (create modal)
+   Pick an existing topic or type a new one.
+========================================================= */
+
+(function() {
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+        var input   = document.getElementById('topicInput');
+        var menu    = document.getElementById('topicMenu');
+        var modalEl = document.getElementById('assessmentModal');
+
+        if (!input || !menu) {
+            return;
+        }
+
+        var activeIndex = -1;
+
+        function options() {
+            return Array.prototype.slice.call(
+                menu.querySelectorAll('.topic-option')
+            );
+        }
+
+        function hideMenu() {
+            menu.hidden = true;
+            activeIndex = -1;
+        }
+
+        function setActive(index) {
+
+            var opts = options();
+
+            opts.forEach(function(o) {
+                o.classList.remove('active');
+            });
+
+            if (!opts.length) {
+                activeIndex = -1;
+                return;
+            }
+
+            activeIndex = (index + opts.length) % opts.length;
+
+            opts[activeIndex].classList.add('active');
+            opts[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        function choose(value) {
+            input.value = value;
+            hideMenu();
+        }
+
+        function addOption(label, value, isNew) {
+
+            var row = document.createElement('div');
+
+            row.className = 'topic-option' + (isNew ? ' new' : '');
+            row.dataset.value = value;
+
+            var icon = document.createElement('i');
+
+            icon.className =
+                'fa-solid ' + (isNew ? 'fa-plus' : 'fa-bookmark');
+
+            var text = document.createElement('span');
+
+            text.textContent = label;
+
+            row.appendChild(icon);
+            row.appendChild(text);
+
+            /* mousedown (not click) so the input does not lose focus first */
+            row.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                choose(value);
+            });
+
+            menu.appendChild(row);
+        }
+
+        function renderMenu() {
+
+            var q  = input.value.trim();
+            var ql = q.toLowerCase();
+
+            menu.innerHTML = '';
+            activeIndex = -1;
+
+            var matches = EXISTING_TOPICS.filter(function(t) {
+                return ql === '' || t.toLowerCase().indexOf(ql) !== -1;
+            });
+
+            matches.forEach(function(t) {
+                addOption(t, t, false);
+            });
+
+            var exact = EXISTING_TOPICS.some(function(t) {
+                return t.toLowerCase() === ql;
+            });
+
+            if (q !== '' && !exact) {
+                addOption('Create topic "' + q + '"', q, true);
+            }
+
+            menu.hidden = (menu.children.length === 0);
+        }
+
+        input.addEventListener('focus', renderMenu);
+        input.addEventListener('input', renderMenu);
+
+        input.addEventListener('keydown', function(e) {
+
+            if (menu.hidden) {
+                return;
+            }
+
+            var opts = options();
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActive(activeIndex + 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActive(activeIndex - 1);
+            } else if (e.key === 'Enter' && activeIndex > -1 && opts[activeIndex]) {
+                e.preventDefault();
+                choose(opts[activeIndex].dataset.value);
+            } else if (e.key === 'Escape') {
+                /* close the dropdown only, not the whole modal */
+                e.stopPropagation();
+                hideMenu();
+            }
+
+        });
+
+        input.addEventListener('blur', function() {
+
+            /* If the text matches an existing topic, use its exact spelling */
+            var ql = input.value.trim().toLowerCase();
+
+            for (var i = 0; i < EXISTING_TOPICS.length; i++) {
+                if (EXISTING_TOPICS[i].toLowerCase() === ql) {
+                    input.value = EXISTING_TOPICS[i];
+                    break;
+                }
+            }
+
+            hideMenu();
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', hideMenu);
+
+    });
+
+})();
 
 /* =========================================================
    MULTIPLE ATTACHMENTS
@@ -2564,6 +3230,105 @@ document.addEventListener('DOMContentLoaded', function() {
         );
 
         render();
+
+    });
+
+})();
+
+/* =========================================================
+   END DATE VALIDATION
+   Blocks creating an assessment whose end date has passed.
+   - No time chosen: the date must be today or later.
+   - Time chosen: the date and time must be in the future.
+========================================================= */
+
+(function() {
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+        var form      = document.getElementById('assessmentForm');
+        var dueDate   = form.querySelector('input[name="due_date"]');
+        var dueTime   = form.querySelector('input[name="due_time"]');
+        var errorBox  = document.getElementById('dateError');
+        var modalEl   = document.getElementById('assessmentModal');
+
+        function showError(message) {
+            errorBox.innerHTML =
+                '<i class="fa-solid fa-circle-exclamation"></i>' + message;
+            errorBox.classList.add('show');
+            dueDate.classList.add('is-invalid');
+            dueTime.classList.add('is-invalid');
+        }
+
+        function clearError() {
+            errorBox.classList.remove('show');
+            errorBox.textContent = '';
+            dueDate.classList.remove('is-invalid');
+            dueTime.classList.remove('is-invalid');
+        }
+
+        function pad(n) {
+            return (n < 10 ? '0' : '') + n;
+        }
+
+        /* Returns an error message, or '' if the end date is fine. */
+        function checkEndDate() {
+
+            var dateVal = dueDate.value;
+
+            if (!dateVal) {
+                return '';
+            }
+
+            var now = new Date();
+
+            var todayStr =
+                now.getFullYear() + '-' +
+                pad(now.getMonth() + 1) + '-' +
+                pad(now.getDate());
+
+            if (dateVal < todayStr) {
+                return 'The end date has already passed. Please choose today or a future date.';
+            }
+
+            if (dateVal === todayStr && dueTime.value) {
+
+                var parts = dueTime.value.split(':');
+                var end = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                    parseInt(parts[0], 10),
+                    parseInt(parts[1], 10),
+                    0
+                );
+
+                if (end <= now) {
+                    return 'The end time has already passed. Please choose a later time.';
+                }
+            }
+
+            return '';
+        }
+
+        form.addEventListener('submit', function(e) {
+
+            var message = checkEndDate();
+
+            if (message) {
+                e.preventDefault();
+                showError(message);
+                errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+
+            clearError();
+
+        });
+
+        dueDate.addEventListener('input', clearError);
+        dueTime.addEventListener('input', clearError);
+        modalEl.addEventListener('hidden.bs.modal', clearError);
 
     });
 

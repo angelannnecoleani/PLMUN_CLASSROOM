@@ -28,6 +28,17 @@ function recordLoginAttempt(mysqli $conn, string $email, bool $success): void
 }
 
 /* =========================================================
+   OPENED DIRECTLY (NOT A FORM SUBMIT)
+   Other pages redirect here when the user is not logged in.
+   Send them to the login form without showing an alert.
+========================================================= */
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header("Location: index.html");
+    exit();
+}
+
+/* =========================================================
    GET LOGIN DATA
 ========================================================= */
 
